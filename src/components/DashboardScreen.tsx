@@ -1,19 +1,26 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { useNavigate } from "react-router-dom";
-import { 
-  TrendingUp, 
-  Calculator, 
-  Plus, 
+import {
+  TrendingUp,
+  Calculator,
+  Plus,
   LayoutDashboard,
   ArrowRight,
   DollarSign,
   Receipt,
-  TrendingDown
+  TrendingDown,
 } from "lucide-react";
+import { fetchIncomes } from "../services/incomeService";
+import { fetchExpenses } from "../services/expenseService";
+import { toast } from "sonner";
 
-export function DashboardScreen() {
+type DashboardScreenProps = {
+  userName?: string;
+};
+
+export function DashboardScreen({ userName }: DashboardScreenProps) {
   const navigate = useNavigate();
   const [quarterIncome, setQuarterIncome] = useState(0);
   const [quarterExpenses, setQuarterExpenses] = useState(0);
@@ -21,25 +28,25 @@ export function DashboardScreen() {
   const [socialTax, setSocialTax] = useState(0);
 
   useEffect(() => {
-    // Get incomes from localStorage (simulating API call)
-    const storedIncomes = localStorage.getItem("fopilot-incomes");
-    if (storedIncomes) {
-      const incomes = JSON.parse(storedIncomes);
-      const total = incomes.reduce((sum: number, income: any) => sum + income.amount, 0);
-      setQuarterIncome(total);
-      
-      // Calculate taxes based on income
-      setSingleTax(total * 0.05);
-      setSocialTax(1474 * 3); // ЄСВ за квартал (3 місяці)
-    }
+    const load = async () => {
+      try {
+        const [incomes, expenses] = await Promise.all([fetchIncomes(), fetchExpenses()]);
 
-    // Get expenses from localStorage
-    const storedExpenses = localStorage.getItem("fopilot-expenses");
-    if (storedExpenses) {
-      const expenses = JSON.parse(storedExpenses);
-      const total = expenses.reduce((sum: number, expense: any) => sum + expense.amount, 0);
-      setQuarterExpenses(total);
-    }
+        const incomeTotal = incomes.reduce((sum, income) => sum + income.amount, 0);
+        const expensesTotal = expenses.reduce((sum, expense) => sum + expense.amount, 0);
+
+        setQuarterIncome(incomeTotal);
+        setQuarterExpenses(expensesTotal);
+
+        setSingleTax(incomeTotal * 0.05);
+        setSocialTax(1474 * 3); // ЄСВ за квартал (3 місяці)
+      } catch (error) {
+        console.error(error);
+        toast.error("Не вдалося завантажити фіндані");
+      }
+    };
+
+    load();
   }, []);
 
   const totalTax = singleTax + socialTax;
@@ -53,7 +60,9 @@ export function DashboardScreen() {
             <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
               <LayoutDashboard className="w-5 h-5 text-blue-600 dark:text-blue-400" />
             </div>
-            <h1 className="text-lg md:text-xl">Приладова панель</h1>
+            <h1 className="text-lg md:text-xl">
+              Привіт{userName ? `, ${userName}` : ""}!
+            </h1>
           </div>
           <p className="text-muted-foreground text-sm md:text-base">
             Огляд вашої фінансової діяльності

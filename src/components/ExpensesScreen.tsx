@@ -1,98 +1,64 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
-import { Input } from "./ui/input";
-import { Label } from "./ui/label";
 import { Button } from "./ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { Plus, TrendingDown, Trash2 } from "lucide-react";
-import { toast } from "sonner@2.0.3";
-
-interface Expense {
-  id: string;
-  date: string;
-  description: string;
-  amount: number;
-  category: string;
-}
+import { toast } from "sonner";
+import { createExpense, deleteExpense, fetchExpenses, type Expense } from "../services/expenseService";
+import { AddTransactionDialog } from "./AddTransactionDialog";
 
 export function ExpensesScreen() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [showDialog, setShowDialog] = useState(false);
 
   useEffect(() => {
-    // Load expenses from localStorage
-    const storedExpenses = localStorage.getItem("fopilot-expenses");
-    if (storedExpenses) {
-      setExpenses(JSON.parse(storedExpenses));
-    } else {
-      // Default sample data
-      const defaultExpenses = [
-        {
-          id: "1",
-          date: "2024-11-03",
-          description: "Оренда офісу",
-          amount: 3000,
-          category: "Оренда",
-        },
-        {
-          id: "2",
-          date: "2024-11-07",
-          description: "Канцтовари",
-          amount: 500,
-          category: "Матеріали",
-        },
-        {
-          id: "3",
-          date: "2024-11-12",
-          description: "Інтернет",
-          amount: 300,
-          category: "Комунальні послуги",
-        },
-      ];
-      setExpenses(defaultExpenses);
-      localStorage.setItem("fopilot-expenses", JSON.stringify(defaultExpenses));
-    }
-  }, []);
-
-  const [amount, setAmount] = useState("");
-  const [description, setDescription] = useState("");
-  const [date, setDate] = useState("");
-  const [category, setCategory] = useState("");
-
-  const handleAddExpense = () => {
-    if (!amount || !description || !date || !category) {
-      toast.error("Заповніть всі поля");
-      return;
-    }
-
-    const numAmount = parseFloat(amount);
-    if (isNaN(numAmount) || numAmount <= 0) {
-      toast.error("Введіть коректну суму");
-      return;
-    }
-
-    const newExpense: Expense = {
-      id: Date.now().toString(),
-      date,
-      description,
-      amount: numAmount,
-      category,
+    const load = async () => {
+      setLoading(true);
+      try {
+        const data = await fetchExpenses();
+        setExpenses(
+          data.map((expense) => ({
+            ...expense,
+            date: typeof expense.date === "string" ? expense.date : new Date(expense.date as unknown as string).toISOString(),
+          }))
+        );
+      } catch (error) {
+        console.error(error);
+        toast.error("Не вдалося завантажити витрати");
+      } finally {
+        setLoading(false);
+      }
     };
 
-    const updatedExpenses = [newExpense, ...expenses];
-    setExpenses(updatedExpenses);
-    localStorage.setItem("fopilot-expenses", JSON.stringify(updatedExpenses));
-    setAmount("");
-    setDescription("");
-    setDate("");
-    setCategory("");
-    toast.success("Витрату успішно додано");
+    load();
+  }, []);
+
+  const handleDeleteExpense = async (id: string) => {
+    try {
+      await deleteExpense(id);
+      setExpenses((prev) => prev.filter((expense) => expense.id !== id));
+      toast.success("Витрату видалено");
+    } catch (error) {
+      console.error(error);
+      toast.error("Не вдалося видалити витрату");
+    }
   };
 
-  const handleDeleteExpense = (id: string) => {
-    const updatedExpenses = expenses.filter((expense) => expense.id !== id);
-    setExpenses(updatedExpenses);
-    localStorage.setItem("fopilot-expenses", JSON.stringify(updatedExpenses));
-    toast.success("Витрату видалено");
+  const handleSaveExpense = async (payload: { amount: number; date: string; description: string; category?: string; client?: string | null }) => {
+    try {
+      const created = await createExpense({
+        amount: payload.amount,
+        description: payload.description,
+        date: payload.date,
+        category: payload.category || "Загальна",
+      });
+      setExpenses((prev) => [created, ...prev]);
+      toast.success("Витрату успішно додано");
+    } catch (error) {
+      console.error(error);
+      toast.error("Не вдалося зберегти витрату");
+    }
   };
 
   const totalQuarter = expenses.reduce((sum, expense) => sum + expense.amount, 0);
@@ -101,82 +67,29 @@ export function ExpensesScreen() {
     <div className="h-full overflow-auto bg-gradient-to-br from-slate-50/70 via-gray-50/50 to-blue-50/40 dark:from-gray-900 dark:via-gray-950 dark:to-red-950/20">
       <div className="p-4 md:p-6 space-y-6">
         {/* Header */}
-        <div className="bg-card rounded-lg border p-4 md:p-6">
-          <div className="flex items-center gap-3 mb-2">
+        <div className="bg-card rounded-lg border p-4 md:p-6 space-y-4">
+          <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
               <TrendingDown className="w-5 h-5 text-red-600 dark:text-red-400" />
             </div>
-            <h1 className="text-lg md:text-xl">Облік витрат</h1>
-          </div>
-          <p className="text-muted-foreground text-sm md:text-base">
-            Відстежуйте свої витрати та контролюйте бюджет
-          </p>
-        </div>
-
-        {/* Add Expense Form */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg md:text-xl">Додати витрату</CardTitle>
-            <CardDescription className="text-sm md:text-base">
-              Заповніть форму для додавання нової витрати
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="amount">Сума (грн)</Label>
-                  <Input
-                    id="amount"
-                    type="number"
-                    placeholder="0.00"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    min="0"
-                    step="0.01"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="date">Дата</Label>
-                  <Input
-                    id="date"
-                    type="date"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="category">Категорія</Label>
-                  <Input
-                    id="category"
-                    type="text"
-                    placeholder="Оренда, Матеріали, Послуги..."
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="description">Опис</Label>
-                  <Input
-                    id="description"
-                    type="text"
-                    placeholder="Деталі витрати"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <Button onClick={handleAddExpense} className="w-full md:w-auto gap-2">
-                <Plus className="w-4 h-4" />
-                Додати витрату
-              </Button>
+            <div>
+              <h1 className="text-lg md:text-xl">Облік витрат</h1>
+              <p className="text-muted-foreground text-sm md:text-base">
+                Відстежуйте свої витрати та контролюйте бюджет
+              </p>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+          <div className="flex justify-start">
+            <Button 
+              onClick={() => setShowDialog(true)} 
+              size="lg"
+              className="w-full sm:w-auto shadow-lg"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Нова транзакція
+            </Button>
+          </div>
+        </div>
 
         {/* Expenses Table */}
         <Card>
@@ -187,19 +100,78 @@ export function ExpensesScreen() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="rounded-md border overflow-x-auto">
-              <Table>
+            {/* Mobile / tablet cards */}
+            <div className="lg:hidden space-y-3">
+              {loading ? (
+                <div className="p-4 rounded-lg border text-center text-muted-foreground">Завантаження...</div>
+              ) : expenses.length === 0 ? (
+                <div className="p-4 rounded-lg border text-center text-muted-foreground">Немає доданих витрат</div>
+              ) : (
+                expenses.map((expense) => (
+                  <div key={expense.id} className="p-4 rounded-lg border space-y-2">
+                    <div className="flex justify-between text-sm text-muted-foreground">
+                      <span>Дата</span>
+                      <span className="font-medium text-foreground">
+                        {new Date(expense.date).toLocaleDateString("uk-UA", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "numeric",
+                        })}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm text-muted-foreground">
+                      <span>Категорія</span>
+                      <span className="font-medium text-foreground text-right">{expense.category}</span>
+                    </div>
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">Опис:</span>{" "}
+                      <span className="font-medium break-words">{expense.description}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Сума</span>
+                      <span className="font-semibold text-red-600 dark:text-red-400">
+                        {expense.amount.toLocaleString("uk-UA", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}{" "}
+                        грн
+                      </span>
+                    </div>
+                    <div className="flex justify-end">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteExpense(expense.id)}
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Desktop table */}
+            <div className="hidden lg:block rounded-md border overflow-x-auto">
+              <Table className="min-w-[720px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Дата</TableHead>
-                    <TableHead>Категорія</TableHead>
-                    <TableHead>Опис</TableHead>
+                    <TableHead className="w-[160px]">Категорія</TableHead>
+                    <TableHead className="w-[260px]">Опис</TableHead>
                     <TableHead className="text-right">Сума</TableHead>
                     <TableHead className="text-right">Дії</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {expenses.length === 0 ? (
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                        Завантаження...
+                      </TableCell>
+                    </TableRow>
+                  ) : expenses.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                         Немає доданих витрат
@@ -215,8 +187,8 @@ export function ExpensesScreen() {
                             year: "numeric",
                           })}
                         </TableCell>
-                        <TableCell>{expense.category}</TableCell>
-                        <TableCell>{expense.description}</TableCell>
+                        <TableCell className="whitespace-normal break-words">{expense.category}</TableCell>
+                        <TableCell className="whitespace-normal break-words">{expense.description}</TableCell>
                         <TableCell className="text-right">
                           {expense.amount.toLocaleString("uk-UA", {
                             minimumFractionDigits: 2,
@@ -255,6 +227,12 @@ export function ExpensesScreen() {
           </CardContent>
         </Card>
       </div>
+      <AddTransactionDialog
+        open={showDialog}
+        onOpenChange={setShowDialog}
+        mode="expense"
+        onSave={handleSaveExpense}
+      />
     </div>
   );
 }

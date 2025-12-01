@@ -14,52 +14,59 @@ interface TaxEvent {
   urgency: "high" | "medium" | "low";
 }
 
-const mockEvents: TaxEvent[] = [
-  {
-    id: "1",
-    date: new Date(2025, 0, 20),
-    title: "Сплата ЄСВ за грудень",
-    description: "Оплата єдиного соціального внеску",
-    type: "payment",
-    urgency: "high"
-  },
-  {
-    id: "2",
-    date: new Date(2025, 1, 10),
-    title: "Подання декларації за IV квартал",
-    description: "Подання податкової декларації ФОП",
-    type: "deadline",
-    urgency: "high"
-  },
-  {
-    id: "3",
-    date: new Date(2025, 1, 20),
-    title: "Сплата ЄП за IV квартал",
-    description: "Оплата єдиного податку",
-    type: "payment",
-    urgency: "medium"
-  },
-  {
-    id: "4",
-    date: new Date(2025, 2, 20),
-    title: "Сплата ЄСВ за лютий",
-    description: "Оплата єдиного соціального внеску",
-    type: "payment",
-    urgency: "medium"
-  },
-  {
-    id: "5",
-    date: new Date(2025, 3, 10),
-    title: "Подання декларації за I квартал 2025",
-    description: "Подання податкової декларації ФОП",
-    type: "deadline",
-    urgency: "low"
+const generateTaxEvents = (year: number): TaxEvent[] => {
+  const events: TaxEvent[] = [];
+
+  // Щомісячний ЄСВ до 20 числа наступного місяця
+  for (let month = 0; month < 12; month++) {
+    events.push({
+      id: `esv-${year}-${month}`,
+      date: new Date(year, month, 20),
+      title: `Сплата ЄСВ за ${new Date(year, month, 1).toLocaleString("uk-UA", { month: "long" })}`,
+      description: "Оплата єдиного соціального внеску до 20 числа",
+      type: "payment",
+      urgency: "medium",
+    });
   }
-];
+
+  // Поквартально: декларація до 10 числа та ЄП до 20 числа після кварталу
+  const quarters = [
+    { endMonth: 2, label: "I квартал" },
+    { endMonth: 5, label: "II квартал" },
+    { endMonth: 8, label: "III квартал" },
+    { endMonth: 11, label: "IV квартал" },
+  ];
+
+  quarters.forEach((q) => {
+    events.push({
+      id: `decl-${year}-${q.endMonth}`,
+      date: new Date(year, q.endMonth + 1, 10), // наступний місяць після кварталу
+      title: `Подання декларації за ${q.label}`,
+      description: "Подання податкової декларації ФОП",
+      type: "deadline",
+      urgency: "high",
+    });
+    events.push({
+      id: `tax-${year}-${q.endMonth}`,
+      date: new Date(year, q.endMonth + 1, 20),
+      title: `Сплата ЄП за ${q.label}`,
+      description: "Оплата єдиного податку до 20 числа",
+      type: "payment",
+      urgency: "high",
+    });
+  });
+
+  return events;
+};
 
 export function TaxCalendarScreen() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const events = generateTaxEvents(currentDate.getFullYear());
+  const nextEvent = (() => {
+    const today = new Date();
+    return events.filter((e) => e.date >= today).sort((a, b) => a.date.getTime() - b.date.getTime())[0];
+  })();
 
   const currentMonth = currentDate.getMonth();
   const currentYear = currentDate.getFullYear();
@@ -77,7 +84,7 @@ export function TaxCalendarScreen() {
   };
 
   const getEventsForDate = (date: Date) => {
-    return mockEvents.filter(
+    return events.filter(
       (event) =>
         event.date.getDate() === date.getDate() &&
         event.date.getMonth() === date.getMonth() &&
@@ -87,7 +94,7 @@ export function TaxCalendarScreen() {
 
   const getUpcomingEvents = () => {
     const today = new Date();
-    return mockEvents
+    return events
       .filter((event) => event.date >= today)
       .sort((a, b) => a.date.getTime() - b.date.getTime())
       .slice(0, 5);
@@ -146,8 +153,14 @@ export function TaxCalendarScreen() {
           <Lightbulb className="h-4 w-4 text-blue-600" />
           <AlertTitle className="text-blue-900 dark:text-blue-100">AI Підказка</AlertTitle>
           <AlertDescription className="text-blue-800 dark:text-blue-200">
-            Наступний важливий дедлайн: сплата ЄСВ за грудень до 20 січня. 
-            Залишилось {Math.ceil((new Date(2025, 0, 20).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} днів.
+            {nextEvent ? (
+              <>
+                Наступний дедлайн: {nextEvent.title} — {nextEvent.date.toLocaleDateString("uk-UA")}.{" "}
+                Залишилось {Math.max(1, Math.ceil((nextEvent.date.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))} днів.
+              </>
+            ) : (
+              "Всі події за поточний рік виконані."
+            )}
           </AlertDescription>
         </Alert>
 

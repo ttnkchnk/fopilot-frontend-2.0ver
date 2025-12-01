@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus, Search, Building2, Mail, Phone, MapPin, CreditCard } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -23,103 +23,12 @@ import {
   DialogTitle,
 } from "./ui/dialog";
 import { Textarea } from "./ui/textarea";
+import { fetchClients, createClient, type Client } from "../services/clientService";
+import { toast } from "sonner";
 
-interface Client {
-  id: string;
-  name: string;
-  country: string;
-  countryFlag: string;
-  logo: string;
-  email: string;
-  phone: string;
-  address: string;
-  iban: string;
-  contractStatus: "active" | "expired" | "pending";
-  totalBilled: number;
-  lastInvoiceDate: string;
-  lastInvoiceAmount: number;
-}
-
-const mockClients: Client[] = [
-  {
-    id: "1",
-    name: "TechCorp Inc.",
-    country: "США",
-    countryFlag: "🇺🇸",
-    logo: "",
-    email: "contact@techcorp.com",
-    phone: "+1 555 0123",
-    address: "123 Tech Street, San Francisco, CA 94102, USA",
-    iban: "US12 3456 7890 1234 5678 90",
-    contractStatus: "active",
-    totalBilled: 125000,
-    lastInvoiceDate: "2025-11-25",
-    lastInvoiceAmount: 2500
-  },
-  {
-    id: "2",
-    name: "DesignStudio GmbH",
-    country: "Німеччина",
-    countryFlag: "🇩🇪",
-    logo: "",
-    email: "hello@designstudio.de",
-    phone: "+49 30 12345678",
-    address: "Berliner Str. 45, 10115 Berlin, Germany",
-    iban: "DE89 3704 0044 0532 0130 00",
-    contractStatus: "active",
-    totalBilled: 89000,
-    lastInvoiceDate: "2025-11-28",
-    lastInvoiceAmount: 1800
-  },
-  {
-    id: "3",
-    name: "StartupHub Ltd",
-    country: "Великобританія",
-    countryFlag: "🇬🇧",
-    logo: "",
-    email: "info@startuphub.co.uk",
-    phone: "+44 20 7946 0958",
-    address: "10 Downing Street, London SW1A 2AA, UK",
-    iban: "GB29 NWBK 6016 1331 9268 19",
-    contractStatus: "expired",
-    totalBilled: 56000,
-    lastInvoiceDate: "2025-10-15",
-    lastInvoiceAmount: 3200
-  },
-  {
-    id: "4",
-    name: "WebAgency SARL",
-    country: "Франція",
-    countryFlag: "🇫🇷",
-    logo: "",
-    email: "contact@webagency.fr",
-    phone: "+33 1 42 86 82 00",
-    address: "15 Rue de la Paix, 75002 Paris, France",
-    iban: "FR14 2004 1010 0505 0001 3M02 606",
-    contractStatus: "active",
-    totalBilled: 72000,
-    lastInvoiceDate: "2025-11-20",
-    lastInvoiceAmount: 1500
-  },
-  {
-    id: "5",
-    name: "CloudServices BV",
-    country: "Нідерланди",
-    countryFlag: "🇳🇱",
-    logo: "",
-    email: "support@cloudservices.nl",
-    phone: "+31 20 794 7000",
-    address: "Herengracht 450, 1017 CA Amsterdam, Netherlands",
-    iban: "NL91 ABNA 0417 1643 00",
-    contractStatus: "pending",
-    totalBilled: 43000,
-    lastInvoiceDate: "2025-11-10",
-    lastInvoiceAmount: 2100
-  }
-];
 
 export function ClientCRMScreen() {
-  const [clients, setClients] = useState<Client[]>(mockClients);
+  const [clients, setClients] = useState<Client[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [newClient, setNewClient] = useState({
@@ -128,65 +37,63 @@ export function ClientCRMScreen() {
     email: "",
     phone: "",
     address: "",
-    iban: ""
+    iban: "",
+    notes: "",
   });
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        const data = await fetchClients();
+        setClients(data);
+      } catch (error) {
+        console.error(error);
+        toast.error("Не вдалося завантажити клієнтів");
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
 
   const filteredClients = clients.filter(
     (client) =>
       client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      client.country.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      client.email.toLowerCase().includes(searchQuery.toLowerCase())
+      (client.country || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (client.email || "").toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleAddClient = () => {
-    const client: Client = {
-      id: Date.now().toString(),
-      name: newClient.name,
-      country: newClient.country,
-      countryFlag: "🌍",
-      logo: "",
-      email: newClient.email,
-      phone: newClient.phone,
-      address: newClient.address,
-      iban: newClient.iban,
-      contractStatus: "pending",
-      totalBilled: 0,
-      lastInvoiceDate: "-",
-      lastInvoiceAmount: 0
-    };
-
-    setClients([...clients, client]);
-    setShowAddDialog(false);
-    setNewClient({
-      name: "",
-      country: "",
-      email: "",
-      phone: "",
-      address: "",
-      iban: ""
-    });
-  };
-
-  const getStatusBadge = (status: Client["contractStatus"]) => {
-    switch (status) {
-      case "active":
-        return (
-          <Badge className="bg-green-100 text-green-700 border-green-200 dark:bg-green-900 dark:text-green-300 dark:border-green-800">
-            Активний
-          </Badge>
-        );
-      case "expired":
-        return (
-          <Badge className="bg-red-100 text-red-700 border-red-200 dark:bg-red-900 dark:text-red-300 dark:border-red-800">
-            Закінчився
-          </Badge>
-        );
-      case "pending":
-        return (
-          <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-900 dark:text-yellow-300 dark:border-yellow-800">
-            Очікує
-          </Badge>
-        );
+  const handleAddClient = async () => {
+    if (!newClient.name.trim()) {
+      toast.error("Вкажіть назву клієнта");
+      return;
+    }
+    try {
+      const created = await createClient({
+        name: newClient.name,
+        country: newClient.country || undefined,
+        email: newClient.email || undefined,
+        phone: newClient.phone || undefined,
+        iban: newClient.iban || undefined,
+        notes: newClient.notes || undefined,
+      });
+      setClients((prev) => [...prev, created]);
+      setShowAddDialog(false);
+      setNewClient({
+        name: "",
+        country: "",
+        email: "",
+        phone: "",
+        address: "",
+        iban: "",
+        notes: "",
+      });
+      toast.success("Клієнта додано");
+    } catch (error) {
+      console.error(error);
+      toast.error("Не вдалося додати клієнта");
     }
   };
 
@@ -196,9 +103,9 @@ export function ClientCRMScreen() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
           <div>
-            <h1 className="mb-2 text-2xl sm:text-3xl">Клієнти</h1>
+            <h1 className="mb-2 text-2xl sm:text-3xl">Клієнти (опційно)</h1>
             <p className="text-muted-foreground text-sm sm:text-base">
-              Управління клієнтською базою та контрактами
+              Модуль для роботи з постійними клієнтами та контрактами. Необов’язково: якщо не ведете клієнтів — можете не користуватися цим розділом.
             </p>
           </div>
           <Button onClick={() => setShowAddDialog(true)} size="lg" className="w-full sm:w-auto">
@@ -227,9 +134,9 @@ export function ClientCRMScreen() {
             <CardContent className="p-4 sm:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Активні контракти</p>
+                  <p className="text-sm text-muted-foreground mb-1">Email вказано</p>
                   <p className="text-2xl sm:text-3xl text-green-600">
-                    {clients.filter((c) => c.contractStatus === "active").length}
+                    {clients.filter((c) => c.email).length}
                   </p>
                 </div>
                 <div className="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-xl flex items-center justify-center">
@@ -243,9 +150,9 @@ export function ClientCRMScreen() {
             <CardContent className="p-4 sm:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Загальний дохід</p>
+                  <p className="text-sm text-muted-foreground mb-1">Телефон вказано</p>
                   <p className="text-2xl sm:text-3xl text-purple-600">
-                    ${clients.reduce((sum, c) => sum + c.totalBilled, 0).toLocaleString()}
+                    {clients.filter((c) => c.phone).length}
                   </p>
                 </div>
                 <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-xl flex items-center justify-center">
@@ -273,11 +180,11 @@ export function ClientCRMScreen() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="min-w-[250px]">Клієнт</TableHead>
+                  <TableHead className="min-w-[220px]">Клієнт</TableHead>
                   <TableHead className="hidden sm:table-cell">Країна</TableHead>
-                  <TableHead>Статус контракту</TableHead>
-                  <TableHead className="text-right">Всього виставлено</TableHead>
-                  <TableHead className="hidden md:table-cell text-right">Останній рахунок</TableHead>
+                  <TableHead className="hidden md:table-cell">Email</TableHead>
+                  <TableHead className="hidden md:table-cell">Телефон</TableHead>
+                  <TableHead className="text-right">Нотатки</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -286,36 +193,34 @@ export function ClientCRMScreen() {
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar className="w-10 h-10">
-                          <AvatarImage src={client.logo} alt={client.name} />
+                          <AvatarImage src="" alt={client.name} />
                           <AvatarFallback className="bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400">
                             {client.name.substring(0, 2).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
                         <div className="min-w-0">
                           <p className="font-medium truncate">{client.name}</p>
-                          <p className="text-sm text-muted-foreground truncate">{client.email}</p>
+                          <p className="text-sm text-muted-foreground truncate">{client.email || "—"}</p>
                         </div>
                       </div>
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">
+                      <span className="text-sm">{client.country || "—"}</span>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
                       <div className="flex items-center gap-2">
-                        <span className="text-2xl">{client.countryFlag}</span>
-                        <span className="text-sm">{client.country}</span>
+                        <Mail className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm">{client.email || "—"}</span>
                       </div>
                     </TableCell>
-                    <TableCell>{getStatusBadge(client.contractStatus)}</TableCell>
-                    <TableCell className="text-right font-medium">
-                      ${client.totalBilled.toLocaleString()}
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell text-right">
-                      <div className="text-sm">
-                        <p className="font-medium">${client.lastInvoiceAmount.toLocaleString()}</p>
-                        <p className="text-muted-foreground text-xs">
-                          {client.lastInvoiceDate !== "-"
-                            ? new Date(client.lastInvoiceDate).toLocaleDateString("uk-UA")
-                            : "-"}
-                        </p>
+                    <TableCell className="hidden md:table-cell">
+                      <div className="flex items-center gap-2">
+                        <Phone className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm">{client.phone || "—"}</span>
                       </div>
+                    </TableCell>
+                    <TableCell className="text-right text-sm text-muted-foreground max-w-[200px] truncate">
+                      {client.notes || "—"}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -326,8 +231,11 @@ export function ClientCRMScreen() {
           {filteredClients.length === 0 && (
             <div className="p-8 sm:p-12 text-center">
               <Building2 className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
-              <p className="text-muted-foreground">
-                {searchQuery ? `Не знайдено клієнтів за запитом "${searchQuery}"` : "Немає клієнтів"}
+              <p className="text-muted-foreground font-medium mb-2">
+                {searchQuery ? `Не знайдено клієнтів за запитом "${searchQuery}"` : "Ще немає жодного клієнта"}
+              </p>
+              <p className="text-muted-foreground text-sm">
+                Додавайте клієнтів лише якщо працюєте за контрактами, інвойсами або хочете аналітику по замовниках. Для кафе, салонів та роздрібних ФОП цей розділ можна ігнорувати.
               </p>
             </div>
           )}
@@ -430,6 +338,17 @@ export function ClientCRMScreen() {
                   className="pl-10"
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="notes">Нотатки</Label>
+              <Textarea
+                id="notes"
+                placeholder="Деталі співпраці, контактні особи..."
+                value={newClient.notes}
+                onChange={(e) => setNewClient({ ...newClient, notes: e.target.value })}
+                rows={2}
+              />
             </div>
           </div>
 

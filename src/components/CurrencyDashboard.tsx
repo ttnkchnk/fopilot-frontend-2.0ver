@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { TrendingUp, TrendingDown, DollarSign, Euro, ArrowUpRight, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
@@ -11,6 +11,8 @@ import {
   TableHeader,
   TableRow,
 } from "./ui/table";
+import { fetchRates, type Rates } from "../services/currencyService";
+import { toast } from "sonner";
 
 interface ExchangeRate {
   currency: string;
@@ -27,21 +29,6 @@ interface SaleRecord {
   amountUAH: number;
   client: string;
 }
-
-const exchangeRates: ExchangeRate[] = [
-  {
-    currency: "USD",
-    rate: 41.25,
-    change: 2.5,
-    trend: [39.8, 40.1, 40.3, 40.6, 40.9, 41.1, 41.25]
-  },
-  {
-    currency: "EUR",
-    rate: 44.80,
-    change: 1.8,
-    trend: [43.2, 43.6, 44.0, 44.2, 44.5, 44.7, 44.80]
-  }
-];
 
 const salesHistory: SaleRecord[] = [
   {
@@ -96,9 +83,44 @@ const chartData = Array.from({ length: 30 }, (_, i) => ({
 export function CurrencyDashboard() {
   const [selectedCurrency, setSelectedCurrency] = useState<"USD" | "EUR">("USD");
   const [lastUpdate, setLastUpdate] = useState(new Date());
+  const [rates, setRates] = useState<Rates | null>(null);
+  const [loadingRates, setLoadingRates] = useState(false);
+
+  const exchangeRates: ExchangeRate[] = [
+    {
+      currency: "USD",
+      rate: rates?.USD ?? 41.25,
+      change: 0,
+      trend: [rates?.USD ?? 41.25],
+    },
+    {
+      currency: "EUR",
+      rate: rates?.EUR ?? 44.8,
+      change: 0,
+      trend: [rates?.EUR ?? 44.8],
+    },
+  ];
+
+  const loadRates = async () => {
+    setLoadingRates(true);
+    try {
+      const data = await fetchRates();
+      setRates(data);
+      setLastUpdate(new Date());
+    } catch (error) {
+      console.error(error);
+      toast.error("Не вдалося отримати курси валют");
+    } finally {
+      setLoadingRates(false);
+    }
+  };
+
+  useEffect(() => {
+    loadRates();
+  }, []);
 
   const handleRefresh = () => {
-    setLastUpdate(new Date());
+    loadRates();
   };
 
   const Sparkline = ({ data, color }: { data: number[]; color: string }) => {
@@ -148,7 +170,7 @@ export function CurrencyDashboard() {
               size="icon"
               onClick={handleRefresh}
             >
-              <RefreshCw className="w-4 h-4" />
+              <RefreshCw className={`w-4 h-4 ${loadingRates ? "animate-spin" : ""}`} />
             </Button>
           </div>
         </div>

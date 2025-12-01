@@ -1,41 +1,59 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Calculator } from "lucide-react";
+import { fetchIncomes } from "../services/incomeService";
+import { toast } from "sonner";
 
 export function TaxesScreen() {
-  const [income, setIncome] = useState("");
+  const [incomeTotal, setIncomeTotal] = useState(0);
   const [result, setResult] = useState<{
     singleTax: number;
     esv: number;
     total: number;
   } | null>(null);
+  const [isCalculating, setIsCalculating] = useState(false);
+  const [loadingData, setLoadingData] = useState(false);
 
-  const handleCalculate = () => {
-    const incomeAmount = parseFloat(income);
-    if (isNaN(incomeAmount) || incomeAmount <= 0) {
-      return;
+  const handleCalculate = async () => {
+    setIsCalculating(true);
+    setLoadingData(true);
+    setResult(null);
+
+    try {
+      const incomes = await fetchIncomes();
+      const incomeAmount = incomes.reduce((sum, item) => sum + item.amount, 0);
+      setIncomeTotal(incomeAmount);
+
+      // Имитируем "AI" расчёт: показываем загрузку и возвращаем авто-расчёт
+      setTimeout(() => {
+        const singleTax = incomeAmount * 0.05; // 5% ФОП 3 група
+        const minWage = 7100; // мінімальна зарплата 2024
+        const esv = minWage * 0.22; // 22% ЄСВ
+        const total = singleTax + esv;
+
+        setResult({
+          singleTax: Math.round(singleTax * 100) / 100,
+          esv: Math.round(esv * 100) / 100,
+          total: Math.round(total * 100) / 100,
+        });
+        setIsCalculating(false);
+      }, 1500);
+    } catch (error) {
+      console.error(error);
+      toast.error("Не вдалося завантажити дані для розрахунку");
+      setIsCalculating(false);
+    } finally {
+      setLoadingData(false);
     }
-
-    // Розрахунок для ФОП 3 група (загальна система)
-    // Єдиний податок 5% від доходу
-    const singleTax = incomeAmount * 0.05;
-    
-    // ЄСВ - мінімальний розмір (для прикладу використаємо 1474 грн на 2024)
-    // В реальності це може бути 22% від мінімальної зарплати
-    const minWage = 7100; // мінімальна зарплата 2024
-    const esv = minWage * 0.22;
-    
-    const total = singleTax + esv;
-
-    setResult({
-      singleTax: Math.round(singleTax * 100) / 100,
-      esv: Math.round(esv * 100) / 100,
-      total: Math.round(total * 100) / 100,
-    });
   };
+
+  useEffect(() => {
+    handleCalculate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handlePayment = () => {
     // Тут буде логіка оплати
@@ -63,29 +81,36 @@ export function TaxesScreen() {
           <CardHeader>
             <CardTitle className="text-lg md:text-xl">Калькулятор податків</CardTitle>
             <CardDescription className="text-sm md:text-base">
-              Введіть суму доходу за квартал для розрахунку
+              Автоматичний розрахунок на основі ваших доходів. ШІ сам підставляє суму.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="income">Введіть суму доходу за квартал</Label>
-              <div className="flex flex-col sm:flex-row gap-3">
+              <Label>Дохід за квартал (авто):</Label>
+              <div className="flex flex-col sm:flex-row items-center gap-3">
                 <Input
-                  id="income"
-                  type="number"
-                  placeholder="0.00"
-                  value={income}
-                  onChange={(e) => setIncome(e.target.value)}
-                  className="flex-1"
+                  readOnly
+                  value={loadingData ? "Завантаження..." : incomeTotal.toLocaleString("uk-UA", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                  className="flex-1 font-semibold"
                 />
-                <Button onClick={handleCalculate} className="gap-2 w-full sm:w-auto">
+                <Button onClick={handleCalculate} className="gap-2 w-full sm:w-auto" variant="secondary">
                   <Calculator className="w-4 h-4" />
-                  Розрахувати
+                  Перерахувати
                 </Button>
               </div>
             </div>
 
-            {result && (
+            {isCalculating && (
+              <div className="mt-4 p-4 rounded-lg border bg-muted/30 flex items-center gap-3 text-sm">
+                <div className="h-3 w-3 rounded-full bg-blue-500 animate-pulse" />
+                ШІ аналізує ваші дані та прораховує податки…
+              </div>
+            )}
+
+            {result && !isCalculating && (
               <div className="mt-6 space-y-4 pt-6 border-t">
                 <div className="space-y-3">
                   <div className="flex justify-between items-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">

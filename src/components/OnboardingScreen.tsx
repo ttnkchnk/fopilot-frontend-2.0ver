@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronRight, ChevronLeft, Check, User, Calculator, Briefcase } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -6,9 +6,13 @@ import { Label } from "./ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Progress } from "./ui/progress";
 import { Switch } from "./ui/switch";
+import { completeOnboarding, type OnboardingPayload, type User as AppUser } from "../services/userService";
+import { toast } from "sonner";
 
 interface OnboardingData {
-  fullName: string;
+  firstName: string;
+  lastName: string;
+  middleName: string;
   taxId: string;
   email: string;
   phone: string;
@@ -17,30 +21,74 @@ interface OnboardingData {
   selectedKveds: string[];
 }
 
-export function OnboardingScreen({ onComplete }: { onComplete?: () => void }) {
+interface OnboardingScreenProps {
+  onComplete?: (user: AppUser) => void;
+  defaultFullName?: string;
+  defaultEmail?: string;
+  defaultPhone?: string;
+}
+
+export function OnboardingScreen({ onComplete, defaultFullName, defaultEmail, defaultPhone }: OnboardingScreenProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 3;
+  const [submitting, setSubmitting] = useState(false);
 
   const [data, setData] = useState<OnboardingData>({
-    fullName: "",
+    firstName: defaultFullName ? defaultFullName.split(" ")[0] : "",
+    lastName: defaultFullName ? defaultFullName.split(" ").slice(1).join(" ") : "",
+    middleName: "",
     taxId: "",
-    email: "",
-    phone: "",
+    email: defaultEmail || "",
+    phone: defaultPhone || "",
     taxGroup: "",
     paysESV: true,
     selectedKveds: []
   });
 
+  useEffect(() => {
+    const parts = (defaultFullName || "").split(" ");
+    const firstName = parts[0] || "";
+    const rest = parts.slice(1).join(" ");
+    setData((prev) => ({
+      ...prev,
+      firstName: firstName || prev.firstName,
+      lastName: rest || prev.lastName,
+      email: defaultEmail || prev.email,
+      phone: defaultPhone || prev.phone,
+    }));
+  }, [defaultFullName, defaultEmail, defaultPhone]);
+
   const progress = (currentStep / totalSteps) * 100;
+
+  const handleFinish = async () => {
+    setSubmitting(true);
+    try {
+      const updatedUser = await completeOnboarding({
+        firstName: data.firstName,
+        lastName: data.lastName,
+        middleName: data.middleName,
+        taxId: data.taxId,
+        email: data.email,
+        phone: data.phone,
+        taxGroup: data.taxGroup,
+        paysESV: data.paysESV,
+        selectedKveds: data.selectedKveds,
+      } as OnboardingPayload);
+      toast.success("Онбординг збережено");
+      onComplete?.(updatedUser);
+    } catch (error) {
+      console.error(error);
+      toast.error("Не вдалося зберегти онбординг");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const nextStep = () => {
     if (currentStep < totalSteps) {
       setCurrentStep(currentStep + 1);
     } else {
-      // Complete onboarding
-      if (onComplete) {
-        onComplete();
-      }
+      handleFinish();
     }
   };
 
@@ -53,7 +101,7 @@ export function OnboardingScreen({ onComplete }: { onComplete?: () => void }) {
   const canProceed = () => {
     switch (currentStep) {
       case 1:
-        return data.fullName && data.taxId && data.email;
+        return data.firstName && data.lastName && data.taxId && data.email;
       case 2:
         return data.taxGroup !== "";
       case 3:
@@ -136,45 +184,69 @@ export function OnboardingScreen({ onComplete }: { onComplete?: () => void }) {
         <CardContent>
           {/* Step 1: Personal Info */}
           {currentStep === 1 && (
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="fullName">Прізвище, ім'я, по батькові</Label>
-                <Input
-                  id="fullName"
-                  value={data.fullName}
-                  onChange={(e) => setData({ ...data, fullName: e.target.value })}
-                  placeholder="Іваненко Іван Іванович"
-                />
+            <div className="grid md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 gap-3">
+                  <div>
+                    <Label htmlFor="firstName">Імʼя</Label>
+                    <Input
+                      id="firstName"
+                      value={data.firstName}
+                      onChange={(e) => setData({ ...data, firstName: e.target.value })}
+                      placeholder="Іван"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="middleName">По батькові (необовʼязково)</Label>
+                    <Input
+                      id="middleName"
+                      value={data.middleName}
+                      onChange={(e) => setData({ ...data, middleName: e.target.value })}
+                      placeholder="Іванович"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="lastName">Прізвище</Label>
+                    <Input
+                      id="lastName"
+                      value={data.lastName}
+                      onChange={(e) => setData({ ...data, lastName: e.target.value })}
+                      placeholder="Іваненко"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="taxId">Реєстраційний номер облікової картки (ІПН)</Label>
+                  <Input
+                    id="taxId"
+                    value={data.taxId}
+                    onChange={(e) => setData({ ...data, taxId: e.target.value })}
+                    placeholder="1234567890"
+                    maxLength={10}
+                  />
+                </div>
               </div>
-              <div>
-                <Label htmlFor="taxId">Реєстраційний номер облікової картки (ІПН)</Label>
-                <Input
-                  id="taxId"
-                  value={data.taxId}
-                  onChange={(e) => setData({ ...data, taxId: e.target.value })}
-                  placeholder="1234567890"
-                  maxLength={10}
-                />
-              </div>
-              <div>
-                <Label htmlFor="email">Електронна пошта</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={data.email}
-                  onChange={(e) => setData({ ...data, email: e.target.value })}
-                  placeholder="example@email.com"
-                />
-              </div>
-              <div>
-                <Label htmlFor="phone">Телефон (необов'язково)</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  value={data.phone}
-                  onChange={(e) => setData({ ...data, phone: e.target.value })}
-                  placeholder="+380 XX XXX XX XX"
-                />
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="email">Електронна пошта</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={data.email}
+                    onChange={(e) => setData({ ...data, email: e.target.value })}
+                    placeholder="example@email.com"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="phone">Телефон (необов'язково)</Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    value={data.phone}
+                    onChange={(e) => setData({ ...data, phone: e.target.value })}
+                    placeholder="+380 XX XXX XX XX"
+                  />
+                </div>
               </div>
             </div>
           )}
@@ -350,8 +422,8 @@ export function OnboardingScreen({ onComplete }: { onComplete?: () => void }) {
               <ChevronLeft className="w-4 h-4 mr-2" />
               Назад
             </Button>
-            <Button onClick={nextStep} disabled={!canProceed()}>
-              {currentStep === totalSteps ? "Завершити" : "Продовжити"}
+            <Button onClick={nextStep} disabled={!canProceed() || submitting}>
+              {currentStep === totalSteps ? (submitting ? "Збереження..." : "Завершити") : "Продовжити"}
               {currentStep < totalSteps && <ChevronRight className="w-4 h-4 ml-2" />}
             </Button>
           </div>

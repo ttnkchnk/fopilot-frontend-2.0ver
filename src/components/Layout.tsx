@@ -8,9 +8,10 @@ import { useNavigate, useLocation } from "react-router-dom";
 interface LayoutProps {
   children: ReactNode;
   onLogout: () => void;
+  userName?: string;
 }
 
-export function Layout({ children, onLogout }: LayoutProps) {
+export function Layout({ children, onLogout, userName }: LayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
@@ -35,7 +36,15 @@ export function Layout({ children, onLogout }: LayoutProps) {
           <Avatar className="w-8 h-8 cursor-pointer">
             <AvatarImage src="" alt="User" />
             <AvatarFallback className="bg-blue-500 text-white text-sm">
-              ІП
+              {userName
+                ? userName
+                    .split(" ")
+                    .filter(Boolean)
+                    .slice(0, 2)
+                    .map((n) => n[0])
+                    .join("")
+                    .toUpperCase()
+                : "ІП"}
             </AvatarFallback>
           </Avatar>
         </Button>
@@ -138,7 +147,7 @@ export function Layout({ children, onLogout }: LayoutProps) {
           onClick={() => handleNavigate("/client-crm")}
         >
           <Users className="w-5 h-5" />
-          Клієнти
+          Клієнти (опц.)
         </Button>
 
         <Button

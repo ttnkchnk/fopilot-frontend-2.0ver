@@ -32,11 +32,13 @@
             "@radix-ui/react-tooltip": "^1.1.6",
             "@tailwindcss/postcss": "^4.1.17",
             "@tailwindcss/vite": "^4.1.17",
+            "axios": "^1.13.2",
             "class-variance-authority": "^0.7.1",
             "clsx": "*",
             "cmdk": "^1.1.1",
             "date-fns": "^4.1.0",
             "embla-carousel-react": "^8.6.0",
+            "firebase": "^12.6.0",
             "input-otp": "^1.4.2",
             "jspdf": "^3.0.4",
             "jspdf-autotable": "^5.0.2",
@@ -55,6 +57,7 @@
       },
       "devDependencies": {
             "@types/node": "^20.10.0",
+            "@types/react": "^19.2.7",
             "@vitejs/plugin-react-swc": "^3.10.2",
             "autoprefixer": "^10.4.22",
             "postcss": "^8.5.6",
@@ -67,5 +70,3 @@
             "build": "vite build"
       }
 }
-
-

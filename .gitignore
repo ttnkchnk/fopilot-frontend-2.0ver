@@ -1,1 +1,10 @@
 node_modules
+firebase.ts
+vite.config.ts
+dist
+.env
+*.local
+.DS_Store
+.vscode
+*.log
+npm-debug.log*

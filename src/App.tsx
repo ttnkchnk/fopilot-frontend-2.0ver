@@ -19,45 +19,54 @@ import { CurrencyDashboard } from "./components/CurrencyDashboard";
 import { ClientCRMScreen } from "./components/ClientCRMScreen";
 import { ArticleDetailScreen } from "./components/ArticleDetailScreen";
 import { ThemeProvider } from "./components/ThemeProvider";
+import { isAuthenticated, logoutBackend } from "./services/authApi";
+import { fetchCurrentUser, User } from "./services/userService";
 
 export default function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [initialized, setInitialized] = useState(false);
+
+  const loadProfile = async () => {
+    try {
+      if (!isAuthenticated()) {
+        setUser(null);
+      } else {
+        const me = await fetchCurrentUser();
+        setUser(me);
+      }
+    } catch (e) {
+      console.error("Failed to load profile", e);
+      setUser(null);
+      logoutBackend();
+    } finally {
+      setInitialized(true);
+    }
+  };
 
   useEffect(() => {
-    // Check if user was previously logged in
-    const wasLoggedIn = localStorage.getItem("fopilot-authenticated");
-    const hasCompletedOnboarding = localStorage.getItem("fopilot-onboarding-completed");
-    
-    if (wasLoggedIn === "true") {
-      setIsAuthenticated(true);
-      if (hasCompletedOnboarding !== "true") {
-        setShowOnboarding(true);
-      }
-    }
+    loadProfile();
   }, []);
 
-  const handleLogin = () => {
-    setIsAuthenticated(true);
-    localStorage.setItem("fopilot-authenticated", "true");
-    // Show onboarding for new users
-    const hasCompletedOnboarding = localStorage.getItem("fopilot-onboarding-completed");
-    if (hasCompletedOnboarding !== "true") {
-      setShowOnboarding(true);
+  const handleLogin = async (loggedInUser?: User) => {
+    if (loggedInUser) {
+      setUser(loggedInUser);
+      return;
     }
+
+    // если бэк не отдаёт пользователя в login/register, дёргаем /auth/me
+    await loadProfile();
   };
 
   const handleLogout = () => {
-    setIsAuthenticated(false);
-    localStorage.removeItem("fopilot-authenticated");
+    logoutBackend();
+    setUser(null);
   };
 
-  const handleOnboardingComplete = () => {
-    setShowOnboarding(false);
-    localStorage.setItem("fopilot-onboarding-completed", "true");
-  };
+  if (!initialized) {
+    return <div>Завантаження…</div>;
+  }
 
-  if (!isAuthenticated) {
+  if (!user) {
     return (
       <ThemeProvider>
         <AuthScreen onLogin={handleLogin} />
@@ -65,10 +74,16 @@ export default function App() {
     );
   }
 
-  if (showOnboarding) {
+  // Якщо онбординг не пройдено — показуємо окремий екран без лейаута
+  if (!user.onboarding_completed) {
     return (
       <ThemeProvider>
-        <OnboardingScreen onComplete={handleOnboardingComplete} />
+        <OnboardingScreen
+          defaultFullName={`${user.first_name} ${user.last_name}`.trim()}
+          defaultEmail={user.email}
+          defaultPhone={user.phone ?? ""}
+          onComplete={(updatedUser) => setUser(updatedUser)}
+        />
       </ThemeProvider>
     );
   }
@@ -76,13 +91,27 @@ export default function App() {
   return (
     <ThemeProvider>
       <BrowserRouter>
-        <Layout onLogout={handleLogout}>
+        <Layout
+          onLogout={handleLogout}
+          userName={user ? user.first_name : undefined}
+        >
           <Routes>
-            <Route path="/" element={<DashboardScreen />} />
+            <Route
+              path="/"
+              element={<DashboardScreen userName={user ? `${user.first_name} ${user.last_name}` : undefined} />}
+            />
             <Route path="/chat" element={<ChatScreen />} />
             <Route path="/income" element={<IncomeScreen />} />
             <Route path="/taxes" element={<TaxesScreen />} />
-            <Route path="/profile" element={<ProfileScreen />} />
+            <Route
+              path="/profile"
+              element={
+                <ProfileScreen
+                  user={user}
+                  onUserUpdated={setUser}
+                />
+              }
+            />
             <Route path="/expenses" element={<ExpensesScreen />} />
             <Route path="/documents" element={<DocumentsScreen />} />
             <Route path="/forms" element={<FormsHubScreen />} />

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, DollarSign, TrendingUp, RefreshCw, HelpCircle, Calendar as CalendarIcon, Building2 } from "lucide-react";
+import { Check, DollarSign, TrendingUp, RefreshCw, HelpCircle, Calendar as CalendarIcon, UserRound } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -12,105 +12,114 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "./ui/select";
-import { Calendar } from "./ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
-import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
-import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "./ui/tooltip";
+import { Calendar } from "./ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { format } from "date-fns";
 import { uk } from "date-fns/locale";
 
 interface AddTransactionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  mode: "income" | "expense";
+  onSave: (payload: {
+    amount: number;
+    date: string;
+    description: string;
+    category?: string;
+    client?: string | null;
+  }) => Promise<void> | void;
 }
 
-type TransactionType = "income-uah" | "income-foreign" | "exchange" | null;
+type TransactionType = "income-uah" | "income-foreign" | "exchange" | "expense" | null;
 
-interface Client {
-  id: string;
-  name: string;
-  logo: string;
-  country: string;
-}
-
-const clients: Client[] = [
-  { id: "1", name: "TechCorp Inc.", logo: "", country: "🇺🇸" },
-  { id: "2", name: "DesignStudio GmbH", logo: "", country: "🇩🇪" },
-  { id: "3", name: "StartupHub Ltd", logo: "", country: "🇬🇧" },
-  { id: "4", name: "WebAgency SARL", logo: "", country: "🇫🇷" },
-  { id: "5", name: "CloudServices BV", logo: "", country: "🇳🇱" }
-];
-
-export function AddTransactionDialog({ open, onOpenChange }: AddTransactionDialogProps) {
+export function AddTransactionDialog({ open, onOpenChange, mode, onSave }: AddTransactionDialogProps) {
   const [selectedType, setSelectedType] = useState<TransactionType>(null);
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState<Date>();
-  const [selectedClient, setSelectedClient] = useState("");
+  const [description, setDescription] = useState("");
+  const [category, setCategory] = useState("");
+  const [client, setClient] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const handleReset = () => {
     setSelectedType(null);
     setAmount("");
     setDate(undefined);
-    setSelectedClient("");
+    setDescription("");
+    setCategory("");
+    setClient(null);
   };
 
-  const handleSubmit = () => {
-    // Logic to save transaction
-    console.log({
-      type: selectedType,
-      amount,
-      date,
-      client: selectedClient
-    });
-    handleReset();
-    onOpenChange(false);
+  const handleSubmit = async () => {
+    if (!amount || !date) {
+      return;
+    }
+    setSaving(true);
+    try {
+      await onSave({
+        amount: parseFloat(amount),
+        date: date.toISOString().slice(0, 10),
+        description: description || "Транзакція",
+        category: mode === "expense" ? category || "Загальна" : undefined,
+        client: client,
+      });
+      handleReset();
+      onOpenChange(false);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const getCurrencySymbol = () => {
     if (selectedType === "income-uah") return "₴";
     if (selectedType === "income-foreign") return "$";
     if (selectedType === "exchange") return "$";
+    if (selectedType === "expense") return "₴";
     return "₴";
   };
 
-  const transactionTypes = [
-    {
-      id: "income-uah" as TransactionType,
-      title: "Дохід (UAH)",
-      description: "Надходження в гривнях",
-      icon: TrendingUp,
-      color: "from-green-500 to-green-600"
-    },
-    {
-      id: "income-foreign" as TransactionType,
-      title: "Дохід (Валюта)",
-      description: "Надходження в USD/EUR",
-      icon: DollarSign,
-      color: "from-blue-500 to-blue-600"
-    },
-    {
-      id: "exchange" as TransactionType,
-      title: "Обмін валюти",
-      description: "Конвертація валюти",
-      icon: RefreshCw,
-      color: "from-purple-500 to-purple-600"
-    }
-  ];
+  const transactionTypes = mode === "income"
+    ? [
+        {
+          id: "income-uah" as TransactionType,
+          title: "Дохід (UAH)",
+          description: "Надходження в гривнях",
+          icon: TrendingUp,
+          color: "from-green-500 to-green-600",
+        },
+        {
+          id: "income-foreign" as TransactionType,
+          title: "Дохід (Валюта)",
+          description: "Надходження в USD/EUR",
+          icon: DollarSign,
+          color: "from-blue-500 to-blue-600",
+        },
+        {
+          id: "exchange" as TransactionType,
+          title: "Обмін валюти",
+          description: "Конвертація валюти",
+          icon: RefreshCw,
+          color: "from-purple-500 to-purple-600",
+        },
+      ]
+    : [
+        {
+          id: "expense" as TransactionType,
+          title: "Витрата",
+          description: "Операційні витрати",
+          icon: RefreshCw,
+          color: "from-red-500 to-red-600",
+        },
+      ];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] p-0 gap-0 shadow-2xl rounded-xl">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto p-0 gap-0 shadow-2xl rounded-xl">
         <DialogHeader className="p-6 pb-4">
           <DialogTitle className="text-2xl">Додати нову транзакцію</DialogTitle>
           <DialogDescription>
@@ -142,7 +151,7 @@ export function AddTransactionDialog({ open, onOpenChange }: AddTransactionDialo
                         <Check className="w-4 h-4 text-white" />
                       </div>
                     )}
-                    
+
                     <div className="flex flex-col items-center text-center space-y-2">
                       <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${type.color} flex items-center justify-center shadow-lg`}>
                         <Icon className="w-7 h-7 text-white" />
@@ -221,14 +230,11 @@ export function AddTransactionDialog({ open, onOpenChange }: AddTransactionDialo
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
-                      id="date"
-                      variant="outline"
-                      className={`w-full h-12 justify-start text-left border-2 hover:border-blue-500 ${
-                        !date && "text-muted-foreground"
-                      }`}
+                      variant={"outline"}
+                      className="w-full justify-start text-left font-normal"
                     >
-                      <CalendarIcon className="mr-3 h-5 w-5" />
-                      {date ? format(date, "d MMMM yyyy", { locale: uk }) : "Оберіть дату"}
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {date ? format(date, "dd MMMM yyyy", { locale: uk }) : "Оберіть дату"}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
@@ -237,120 +243,70 @@ export function AddTransactionDialog({ open, onOpenChange }: AddTransactionDialo
                       selected={date}
                       onSelect={setDate}
                       initialFocus
-                      locale={uk}
                     />
                   </PopoverContent>
                 </Popover>
               </div>
 
-              {/* Client/Counterparty Dropdown */}
+              {/* Description */}
               <div className="space-y-2">
-                <TooltipProvider>
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="client">Клієнт / Контрагент</Label>
+                <Label htmlFor="description">Опис</Label>
+                <Input
+                  id="description"
+                  placeholder={mode === "income" ? "Напр., Оплата за послуги" : "Напр., Оренда офісу"}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                />
+              </div>
+
+              {/* Category for expenses */}
+              {mode === "expense" && (
+                <div className="space-y-2">
+                  <Label htmlFor="category">Категорія</Label>
+                  <Input
+                    id="category"
+                    placeholder="Оренда, Матеріали, Послуги..."
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                  />
+                </div>
+              )}
+
+              {/* Optional client */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="client">Клієнт / Контрагент (необовʼязково)</Label>
+                  <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <button type="button" className="text-muted-foreground hover:text-foreground transition-colors">
                           <HelpCircle className="w-4 h-4" />
                         </button>
                       </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Виберіть клієнта або контрагента транзакції</p>
+                      <TooltipContent className="max-w-xs text-sm">
+                        Необов’язкове поле. Вкажіть клієнта, якщо працюєте за контрактами чи інвойсами (IT, консалтинг, B2B). Якщо ви працюєте з готівкою або не ведете облік клієнтів — залиште порожнім.
                       </TooltipContent>
                     </Tooltip>
-                  </div>
-                </TooltipProvider>
-
-                <Select value={selectedClient} onValueChange={setSelectedClient}>
-                  <SelectTrigger id="client" className="h-12 border-2">
-                    <SelectValue placeholder="Оберіть клієнта">
-                      {selectedClient && (
-                        <div className="flex items-center gap-3">
-                          <Avatar className="w-7 h-7">
-                            <AvatarImage src={clients.find(c => c.id === selectedClient)?.logo} />
-                            <AvatarFallback className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400">
-                              {clients.find(c => c.id === selectedClient)?.name.substring(0, 2).toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className="flex items-center gap-2">
-                            <span className="text-lg">{clients.find(c => c.id === selectedClient)?.country}</span>
-                            {clients.find(c => c.id === selectedClient)?.name}
-                          </span>
-                        </div>
-                      )}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clients.map((client) => (
-                      <SelectItem key={client.id} value={client.id}>
-                        <div className="flex items-center gap-3 py-1">
-                          <Avatar className="w-7 h-7">
-                            <AvatarImage src={client.logo} />
-                            <AvatarFallback className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400">
-                              {client.name.substring(0, 2).toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className="flex items-center gap-2">
-                            <span className="text-lg">{client.country}</span>
-                            {client.name}
-                          </span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Additional Fields Based on Type */}
-              {selectedType === "exchange" && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Продано</Label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
-                        $
-                      </span>
-                      <Input
-                        type="number"
-                        placeholder="0.00"
-                        className="pl-8"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Курс обміну</Label>
-                    <Input
-                      type="number"
-                      placeholder="41.25"
-                    />
-                  </div>
+                  </TooltipProvider>
                 </div>
-              )}
+                <div className="flex items-center gap-3">
+                  <UserRound className="w-4 h-4 text-muted-foreground" />
+                  <Input
+                    id="client"
+                    placeholder="Оберіть клієнта (необов'язково) або залиште порожнім"
+                    value={client || ""}
+                    onChange={(e) => setClient(e.target.value || null)}
+                  />
+                </div>
+              </div>
             </div>
           )}
         </div>
 
-        <DialogFooter className="px-6 py-4 bg-gray-50 dark:bg-gray-900 rounded-b-xl border-t">
-          <div className="flex flex-col-reverse sm:flex-row gap-2 w-full">
-            <Button
-              variant="outline"
-              onClick={() => {
-                handleReset();
-                onOpenChange(false);
-              }}
-              className="flex-1 sm:flex-none"
-            >
-              Скасувати
-            </Button>
-            <Button
-              onClick={handleSubmit}
-              disabled={!selectedType || !amount || !date || !selectedClient}
-              className="flex-1 sm:flex-none shadow-lg"
-              size="lg"
-            >
-              Додати транзакцію
-            </Button>
-          </div>
+        <DialogFooter className="px-6 pb-6">
+          <Button className="w-full" onClick={handleSubmit} disabled={saving || !selectedType}>
+            {saving ? "Збереження..." : "Зберегти транзакцію"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "./ui/button";
 import { Send, Sparkles } from "lucide-react";
+import { fetchChatHistory, sendChatMessage, type ChatMessage } from "../services/chatService";
+import { toast } from "sonner";
 
 interface Message {
   id: string;
@@ -28,28 +30,64 @@ function TypingMessage({ text }: { text: string }) {
 }
 
 export function ChatScreen() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "1",
-      text: "Вітаю! Я ваш помічник FOPilot 💙 Можу допомогти з питаннями про податки, звітність та ведення ФОП. Що вас цікавить?",
-      sender: "bot",
-      timestamp: new Date(),
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const botResponses = [
-    "Це цікаве питання! Як ФОП, ви маєте сплачувати єдиний податок та ЄСВ щоквартально.",
-    "Рекомендую звернутися до розділу 'Податки' для розрахунку ваших зобов'язань.",
-    "Для детальної консультації можу порекомендувати перевірити офіційний сайт ДПС України.",
-    "Звісно! Я тут, щоб допомогти. Які ще питання у вас є? 😊",
-    "Для ФОП третьої групи ставка єдиного податку становить 5% від доходу.",
-    "ЄСВ потрібно сплачувати щомісяця до 20 числа наступного місяця.",
-    "Декларацію подають до 10 числа після закінчення кварталу. Потрібна допомога з заповненням?",
-  ];
+  useEffect(() => {
+    const loadHistory = async () => {
+      try {
+        const data = await fetchChatHistory();
+        if (data.length === 0) {
+          setMessages([
+            {
+              id: "welcome",
+              text: "Вітаю! Я ваш помічник FOPilot 💙 Можу допомогти з питаннями про податки, звітність та ведення ФОП. Що вас цікавить?",
+              sender: "bot",
+              timestamp: new Date(),
+            },
+          ]);
+          return;
+        }
+
+        const formatted: Message[] = data.map((msg: ChatMessage) => {
+          const rawTs: any = msg.timestamp;
+          let date: Date;
+          if (typeof rawTs === "string") {
+            date = new Date(rawTs);
+          } else if (rawTs?._seconds) {
+            date = new Date(rawTs._seconds * 1000);
+          } else {
+            date = new Date();
+          }
+
+          return {
+            id: msg.id,
+            sender: msg.sender,
+            text: msg.text,
+            timestamp: date,
+          };
+        });
+
+        setMessages(formatted);
+      } catch (error) {
+        console.error(error);
+        toast.error("Не вдалося завантажити історію чату");
+        setMessages([
+          {
+            id: "welcome",
+            text: "Вітаю! Я ваш помічник FOPilot 💙 Можу допомогти з питаннями про податки, звітність та ведення ФОП. Що вас цікавить?",
+            sender: "bot",
+            timestamp: new Date(),
+          },
+        ]);
+      }
+    };
+
+    loadHistory();
+  }, []);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -57,7 +95,7 @@ export function ChatScreen() {
     }
   }, [messages, isTyping]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!inputValue.trim()) return;
 
     const userMessage: Message = {
@@ -71,18 +109,21 @@ export function ChatScreen() {
     setInputValue("");
     setIsTyping(true);
 
-    // Simulate bot response
-    setTimeout(() => {
+    try {
+      const { reply } = await sendChatMessage(userMessage.text);
       setIsTyping(false);
       const botMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: botResponses[Math.floor(Math.random() * botResponses.length)],
+        text: reply,
         sender: "bot",
         timestamp: new Date(),
-        isTyping: true,
       };
       setMessages((prev) => [...prev, botMessage]);
-    }, 1200);
+    } catch (error) {
+      console.error(error);
+      setIsTyping(false);
+      toast.error("Не вдалося надіслати повідомлення");
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
