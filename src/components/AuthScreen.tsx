@@ -97,11 +97,11 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-white p-4">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-950 to-indigo-950 p-4">
+      <Card className="w-full max-w-md border border-[#3be2ff33] bg-[#0f172a]/90 backdrop-blur-xl shadow-[0_0_30px_-12px_rgba(59,226,255,0.6)] text-white">
         <CardHeader className="text-center space-y-2">
-          <CardTitle className="text-blue-600">FOPilot</CardTitle>
-          <CardDescription>
+          <CardTitle className="text-blue-400 drop-shadow-[0_0_12px_rgba(59,130,246,0.6)]">FOPilot</CardTitle>
+          <CardDescription className="text-slate-300">
             {isLogin ? "Увійдіть до свого облікового запису" : "Створіть новий обліковий запис"}
           </CardDescription>
         </CardHeader>
@@ -137,6 +137,7 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
             placeholder="+380 XX XXX XX XX"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
+            className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-400"
           />
         </div>
       )}
@@ -150,6 +151,7 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-400"
               />
             </div>
 
@@ -162,16 +164,22 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-400"
               />
             </div>
 
             <div className="flex gap-3">
-              <Button type="submit" className="flex-1" disabled={loading}>
+              <Button
+                type="submit"
+                className="flex-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-blue-600 text-white shadow-[0_10px_30px_rgba(59,130,246,0.35)] hover:shadow-[0_12px_36px_rgba(59,130,246,0.45)] border border-white/10"
+                disabled={loading}
+              >
                 {loading ? "Завантаження..." : isLogin ? "Увійти" : "Зареєструватися"}
               </Button>
               <Button
                 type="button"
                 variant="outline"
+                className="flex-1 border border-white/20 text-white hover:text-white hover:bg-white/5"
                 onClick={() => setIsLogin((prev) => !prev)}
               >
                 {isLogin ? "Реєстрація" : "Увійти"}
@@ -184,15 +192,14 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
               <span className="w-full border-t" />
             </div>
             <div className="relative flex justify-center">
-              <span className="bg-card px-2 text-muted-foreground text-xs uppercase">
+              <span className="bg-[#0f172a] px-2 text-slate-400 text-xs uppercase">
                 або
               </span>
             </div>
           </div>
 
           <Button
-            variant="outline"
-            className="w-full h-12 gap-3"
+            className="w-full h-12 gap-3 bg-white/10 border border-white/20 text-white hover:bg-white/15 shadow-[0_10px_30px_rgba(59,130,246,0.2)]"
             onClick={handleGoogleLogin}
             disabled={loading}
           >

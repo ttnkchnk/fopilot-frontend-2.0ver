@@ -7,11 +7,17 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
+      injectRegister: 'auto',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+      injectManifest: {
+        minify: false,
+      },
       manifest: {
-        name: 'Fopilot',
-        short_name: 'Fopilot',
+        name: 'FOPilot',
+        short_name: 'FOPilot',
         description: 'Ваш помічник ФОП',
         theme_color: '#ffffff',
         icons: [

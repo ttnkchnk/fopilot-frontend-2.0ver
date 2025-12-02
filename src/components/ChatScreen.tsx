@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "./ui/button";
-import { Send, Sparkles, FileText, Calculator, Wallet } from "lucide-react";
+import { Send, Sparkles, FileText, Calculator, Wallet, Clock3 } from "lucide-react";
 import { fetchChatHistory, sendChatMessage, type ChatMessage } from "../services/chatService";
 import { toast } from "sonner";
 
@@ -157,12 +157,20 @@ export function ChatScreen() {
     handleSend(text);
   };
 
-  // Group messages by time
-  const shouldShowTimestamp = (currentMsg: Message, prevMsg?: Message) => {
+  const isSameDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+
+  // Date separator лише на початку дня
+  const shouldShowDateSeparator = (currentMsg: Message, prevMsg?: Message) => {
     if (!prevMsg) return true;
-    const timeDiff = currentMsg.timestamp.getTime() - prevMsg.timestamp.getTime();
-    return timeDiff > 60000; // Show timestamp if more than 1 minute apart
+    return !isSameDay(currentMsg.timestamp, prevMsg.timestamp);
   };
+
+  const formatDateSeparator = (d: Date) =>
+    d.toLocaleDateString("uk-UA", { day: "2-digit", month: "long" });
+
+  const formatTime = (d: Date) =>
+    d.toLocaleTimeString("uk-UA", { hour: "2-digit", minute: "2-digit" });
 
   return (
     <div className="flex flex-col h-full bg-gradient-to-b from-gray-50 to-white dark:from-gray-950 dark:to-gray-900">
@@ -190,19 +198,16 @@ export function ChatScreen() {
       >
         {messages.map((message, index) => {
           const prevMessage = index > 0 ? messages[index - 1] : undefined;
-          const showTimestamp = shouldShowTimestamp(message, prevMessage);
-          const isConsecutive = prevMessage?.sender === message.sender && !showTimestamp;
+          const showDate = shouldShowDateSeparator(message, prevMessage);
+          const isConsecutive = prevMessage?.sender === message.sender && !showDate;
 
           return (
             <div key={message.id}>
               {/* Timestamp */}
-              {showTimestamp && (
+              {showDate && (
                 <div className="text-center my-4">
                   <span className="text-xs text-gray-500 dark:text-gray-400 px-3 py-1 rounded-full bg-white/50 dark:bg-gray-800/50">
-                    {message.timestamp.toLocaleTimeString("uk-UA", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                    {formatDateSeparator(message.timestamp)}
                   </span>
                 </div>
               )}
@@ -238,11 +243,22 @@ export function ChatScreen() {
                         : "0 8px 24px rgba(0,0,0,0.10)",
                   }}
                 >
-                  {message.isTyping && message.sender === "bot" ? (
-                    <TypingMessage text={message.text} />
-                  ) : (
-                    <span className="text-[15px] leading-[20px]">{message.text}</span>
-                  )}
+                  <div className="flex flex-col gap-1">
+                    {message.isTyping && message.sender === "bot" ? (
+                      <TypingMessage text={message.text} />
+                    ) : (
+                      <span className="text-[15px] leading-[20px]">{message.text}</span>
+                    )}
+                    <span
+                      className={`text-[11px] ${
+                        message.sender === "user"
+                          ? "text-blue-50/80"
+                          : "text-slate-500 dark:text-slate-400"
+                      } text-right`}
+                    >
+                      {formatTime(message.timestamp)}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>

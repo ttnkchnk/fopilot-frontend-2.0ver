@@ -41,10 +41,37 @@ export function Layout({ children, onLogout, userName }: LayoutProps) {
     setIsOpen(false);
   };
 
+  const navItems = [
+    { path: "/", label: "Панель", icon: LayoutDashboard },
+    { path: "/chat", label: "Чат", icon: MessageSquare },
+    { path: "/income", label: "Доходи", icon: TrendingUp },
+    { path: "/expenses", label: "Витрати", icon: TrendingDown },
+    { path: "/taxes", label: "Податки", icon: Calculator },
+    { path: "/documents", label: "Документи", icon: FileText },
+    { path: "/archive", label: "Архів", icon: Archive },
+    { path: "/forms", label: "Бланки", icon: FilePlus },
+    { path: "/calendar", label: "Календар", icon: CalendarDays },
+    { path: "/client-crm", label: "Клієнти (опц.)", icon: Users },
+    { path: "/currency-dashboard", label: "Валюта", icon: DollarSign },
+    { path: "/knowledge-base", label: "База знань", icon: HelpCircle },
+    { path: "/profile", label: "Профіль", icon: User },
+  ];
+
+  const navButtonClasses = (path: string) => {
+    const active = isActive(path);
+    return `w-full justify-start gap-3 rounded-xl border transition-all ${
+      active
+        ? "bg-gradient-to-r from-blue-500/80 via-indigo-500/80 to-blue-600/70 text-white border-white/10 shadow-[0_10px_30px_rgba(59,130,246,0.25)]"
+        : "text-slate-200 hover:text-white hover:bg-white/5 border-transparent"
+    }`;
+  };
+
   const SidebarContent = () => (
     <>
       <div className="p-6 flex items-center justify-between">
-        <h1 className="text-blue-500">FOPilot</h1>
+        <h1 className="text-xl font-semibold text-white drop-shadow-[0_0_16px_rgba(59,130,246,0.6)]">
+          FOPilot
+        </h1>
         <div className="flex items-center gap-2">
           <Popover>
             <PopoverTrigger asChild>
@@ -93,7 +120,7 @@ export function Layout({ children, onLogout, userName }: LayoutProps) {
           >
             <Avatar className="w-8 h-8 cursor-pointer">
               <AvatarImage src="" alt="User" />
-              <AvatarFallback className="bg-blue-500 text-white text-sm">
+              <AvatarFallback className="bg-gray-700 text-white text-sm">
                 {userName
                   ? userName
                       .split(" ")
@@ -109,159 +136,32 @@ export function Layout({ children, onLogout, userName }: LayoutProps) {
         </div>
       </div>
 
-      <nav className="flex-1 px-3 space-y-1 overflow-y-auto">
-        <Button
-          variant={isActive("/") ? "default" : "ghost"}
-          className={`w-full justify-start gap-3 ${
-            isActive("/") ? "" : "text-sidebar-foreground hover:bg-sidebar-accent"
-          }`}
-          onClick={() => handleNavigate("/")}
-        >
-          <LayoutDashboard className="w-5 h-5" />
-          Панель
-        </Button>
-
-        <Button
-          variant={isActive("/chat") ? "default" : "ghost"}
-          className={`w-full justify-start gap-3 ${
-            isActive("/chat") ? "" : "text-sidebar-foreground hover:bg-sidebar-accent"
-          }`}
-          onClick={() => handleNavigate("/chat")}
-        >
-          <MessageSquare className="w-5 h-5" />
-          Чат
-        </Button>
-
-        <Button
-          variant={isActive("/income") ? "default" : "ghost"}
-          className={`w-full justify-start gap-3 ${
-            isActive("/income") ? "" : "text-sidebar-foreground hover:bg-sidebar-accent"
-          }`}
-          onClick={() => handleNavigate("/income")}
-        >
-          <TrendingUp className="w-5 h-5" />
-          Доходи
-        </Button>
-
-        <Button
-          variant={isActive("/expenses") ? "default" : "ghost"}
-          className={`w-full justify-start gap-3 ${
-            isActive("/expenses") ? "" : "text-sidebar-foreground hover:bg-sidebar-accent"
-          }`}
-          onClick={() => handleNavigate("/expenses")}
-        >
-          <TrendingDown className="w-5 h-5" />
-          Витрати
-        </Button>
-
-        <Button
-          variant={isActive("/taxes") ? "default" : "ghost"}
-          className={`w-full justify-start gap-3 ${
-            isActive("/taxes") ? "" : "text-sidebar-foreground hover:bg-sidebar-accent"
-          }`}
-          onClick={() => handleNavigate("/taxes")}
-        >
-          <Calculator className="w-5 h-5" />
-          Податки
-        </Button>
-
-        <Button
-          variant={isActive("/documents") ? "default" : "ghost"}
-          className={`w-full justify-start gap-3 ${
-            isActive("/documents") ? "" : "text-sidebar-foreground hover:bg-sidebar-accent"
-          }`}
-          onClick={() => handleNavigate("/documents")}
-        >
-          <FileText className="w-5 h-5" />
-          Документи
-        </Button>
-
-        <Button
-          variant={isActive("/archive") ? "default" : "ghost"}
-          className={`w-full justify-start gap-3 ${
-            isActive("/archive") ? "" : "text-sidebar-foreground hover:bg-sidebar-accent"
-          }`}
-          onClick={() => handleNavigate("/archive")}
-        >
-          <Archive className="w-5 h-5" />
-          Архів
-        </Button>
-
-        <Button
-          variant={isActive("/forms") ? "default" : "ghost"}
-          className={`w-full justify-start gap-3 ${
-            isActive("/forms") ? "" : "text-sidebar-foreground hover:bg-sidebar-accent"
-          }`}
-          onClick={() => handleNavigate("/forms")}
-        >
-          <FilePlus className="w-5 h-5" />
-          Бланки
-        </Button>
-
-        <Button
-          variant={isActive("/calendar") ? "default" : "ghost"}
-          className={`w-full justify-start gap-3 ${
-            isActive("/calendar") ? "" : "text-sidebar-foreground hover:bg-sidebar-accent"
-          }`}
-          onClick={() => handleNavigate("/calendar")}
-        >
-          <CalendarDays className="w-5 h-5" />
-          Календар
-        </Button>
-
-        <Button
-          variant={isActive("/client-crm") ? "default" : "ghost"}
-          className={`w-full justify-start gap-3 ${
-            isActive("/client-crm") ? "" : "text-sidebar-foreground hover:bg-sidebar-accent"
-          }`}
-          onClick={() => handleNavigate("/client-crm")}
-        >
-          <Users className="w-5 h-5" />
-          Клієнти (опц.)
-        </Button>
-
-        <Button
-          variant={isActive("/currency-dashboard") ? "default" : "ghost"}
-          className={`w-full justify-start gap-3 ${
-            isActive("/currency-dashboard") ? "" : "text-sidebar-foreground hover:bg-sidebar-accent"
-          }`}
-          onClick={() => handleNavigate("/currency-dashboard")}
-        >
-          <DollarSign className="w-5 h-5" />
-          Валюта
-        </Button>
-
-        <Button
-          variant={isActive("/knowledge-base") ? "default" : "ghost"}
-          className={`w-full justify-start gap-3 ${
-            isActive("/knowledge-base") ? "" : "text-sidebar-foreground hover:bg-sidebar-accent"
-          }`}
-          onClick={() => handleNavigate("/knowledge-base")}
-        >
-          <HelpCircle className="w-5 h-5" />
-          База знань
-        </Button>
-
-        <Button
-          variant={isActive("/profile") ? "default" : "ghost"}
-          className={`w-full justify-start gap-3 ${
-            isActive("/profile") ? "" : "text-sidebar-foreground hover:bg-sidebar-accent"
-          }`}
-          onClick={() => handleNavigate("/profile")}
-        >
-          <User className="w-5 h-5" />
-          Профіль
-        </Button>
+      <nav className="flex-1 px-3 space-y-2 overflow-y-auto">
+        {navItems.map(({ path, label, icon: Icon }) => {
+          const active = isActive(path);
+          return (
+            <Button
+              key={path}
+              variant="ghost"
+              className={navButtonClasses(path)}
+              onClick={() => handleNavigate(path)}
+              aria-current={active ? "page" : undefined}
+            >
+              <Icon className={`w-5 h-5 ${active ? "text-white" : "text-blue-200/80"}`} />
+              {label}
+            </Button>
+          );
+        })}
       </nav>
 
       <div className="p-3 border-t border-sidebar-border">
         <Button
           variant="ghost"
-          className="w-full justify-start gap-3 text-destructive hover:bg-destructive/10 hover:text-destructive"
+          className="w-full justify-start gap-3 rounded-xl border transition-all text-white hover:text-white hover:bg-white/5 border-white/10 shadow-[0_0_14px_rgba(59,130,246,0.35)] hover:shadow-[0_0_18px_rgba(59,130,246,0.45)] drop-shadow-[0_0_16px_rgba(59,130,246,0.6)]"
           onClick={onLogout}
         >
           <LogOut className="w-5 h-5" />
-          Вийти
+          Вийти з акаунту
         </Button>
       </div>
     </>
@@ -270,13 +170,28 @@ export function Layout({ children, onLogout, userName }: LayoutProps) {
   return (
     <div className="flex h-screen bg-gradient-to-br from-blue-50/70 via-indigo-50/40 to-slate-50/60 dark:from-gray-950 dark:via-blue-950/20 dark:to-purple-950/10">
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex w-64 bg-white/70 dark:bg-sidebar/95 backdrop-blur-xl border-r border-gray-200/50 dark:border-sidebar-border flex-col shadow-xl">
+      <aside className="hidden md:flex w-64 bg-gradient-to-r from-gray-800 via-gray-900 to-gray-800/80 text-white border-r border-gray-800 backdrop-blur-xl flex-col shadow-xl">
         <SidebarContent />
       </aside>
 
       {/* Mobile Header & Sidebar */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-white/90 dark:bg-card/95 backdrop-blur-xl border-b border-gray-200/50 dark:border-gray-800 px-4 py-3 flex items-center justify-between shadow-lg">
-        <h1 className="text-blue-500">FOPilot</h1>
+      <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-gray-800 via-gray-900 to-gray-800 text-white backdrop-blur-xl border-b border-gray-700 px-4 py-3 flex items-center justify-between shadow-lg">
+        <div className="flex items-center gap-3">
+          <Sheet open={isOpen} onOpenChange={setIsOpen}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <Menu className="w-6 h-6" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-64 p-0" aria-describedby={undefined}>
+              <SheetTitle className="sr-only">Навігаційне меню</SheetTitle>
+              <div className="flex flex-col h-full bg-gradient-to-b from-gray-900 via-gray-950 to-gray-900 text-white">
+                <SidebarContent />
+              </div>
+            </SheetContent>
+          </Sheet>
+          <h1 className="text-xl font-semibold drop-shadow-[0_0_16px_rgba(59,130,246,0.7)] mx-auto">FOPilot</h1>
+        </div>
         <div className="flex items-center gap-2">
           <Popover>
             <PopoverTrigger asChild>
@@ -301,7 +216,9 @@ export function Layout({ children, onLogout, userName }: LayoutProps) {
                     variant="outline"
                     size="sm"
                     className="mt-3 border-amber-400 text-white hover:bg-amber-400 hover:text-slate-900"
-                    onClick={() => handleNavigate("/calendar")}
+                    onClick={() => {
+                      handleNavigate("/calendar");
+                    }}
                   >
                     В календар
                   </Button>
@@ -317,9 +234,9 @@ export function Layout({ children, onLogout, userName }: LayoutProps) {
             className="rounded-full"
             onClick={() => handleNavigate("/profile")}
           >
-            <Avatar className="w-8 h-8">
+            <Avatar className="w-10 h-10">
               <AvatarImage src="" alt="User" />
-              <AvatarFallback className="bg-blue-600 text-white text-sm">
+              <AvatarFallback className="bg-gray-700 text-white text-sm">
                 {userName
                   ? userName
                       .split(" ")
@@ -332,24 +249,11 @@ export function Layout({ children, onLogout, userName }: LayoutProps) {
               </AvatarFallback>
             </Avatar>
           </Button>
-          <Sheet open={isOpen} onOpenChange={setIsOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <Menu className="w-6 h-6" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="w-64 p-0" aria-describedby={undefined}>
-              <SheetTitle className="sr-only">Навігаційне меню</SheetTitle>
-              <div className="flex flex-col h-full bg-sidebar">
-                <SidebarContent />
-              </div>
-            </SheetContent>
-          </Sheet>
         </div>
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-hidden flex flex-col pt-[57px] md:pt-0">
+      <main className="flex-1 overflow-auto flex flex-col pt-[57px] md:pt-0">
         {children}
       </main>
     </div>

@@ -1,5 +1,5 @@
 {
-      "name": "FOPilot PWA App Design",
+      "name": "FOPilot",
       "version": "0.1.0",
       "private": true,
       "type": "module",
@@ -67,7 +67,8 @@
             "vite-plugin-pwa": "^1.2.0"
       },
       "scripts": {
-            "dev": "vite",
-            "build": "vite build"
+      "dev": "vite",
+      "build": "vite build",
+      "preview": "vite preview --host"
       }
 }

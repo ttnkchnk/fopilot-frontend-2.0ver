@@ -6,6 +6,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/
 import { Calculator } from "lucide-react";
 import { fetchIncomes } from "../services/incomeService";
 import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
 
 export function TaxesScreen() {
   const [incomeTotal, setIncomeTotal] = useState(0);
@@ -16,6 +24,7 @@ export function TaxesScreen() {
   } | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
 
   const handleCalculate = async () => {
     setIsCalculating(true);
@@ -56,8 +65,13 @@ export function TaxesScreen() {
   }, []);
 
   const handlePayment = () => {
-    // Тут буде логіка оплати
-    alert("Функція оплати буде доступна незабаром!");
+    setShowPaymentDialog(true);
+  };
+
+  const handleMonobankRedirect = () => {
+    // Лінк на оплату через Monobank (можна підставити реальний deep-link/інвойс)
+    window.open("https://www.monobank.ua/", "_blank", "noopener");
+    setShowPaymentDialog(false);
   };
 
   return (
@@ -123,7 +137,7 @@ export function TaxesScreen() {
                     <span className="font-medium">{result.esv.toLocaleString("uk-UA")} грн</span>
                   </div>
 
-                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 p-4 bg-blue-600 text-white rounded-lg">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 p-4 bg-white/5 border border-[#3be2ff33] text-white rounded-lg backdrop-blur shadow-[0_0_30px_-12px_rgba(59,226,255,0.6)]">
                     <span className="text-base md:text-lg">Всього до сплати:</span>
                     <span className="text-xl md:text-2xl font-bold">{result.total.toLocaleString("uk-UA")} грн</span>
                   </div>
@@ -154,6 +168,33 @@ export function TaxesScreen() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Payment dialog */}
+      <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Оплата через Monobank</DialogTitle>
+            <DialogDescription>
+              Перейти на сайт monobank для оплати розрахованої суми податків.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <p>Ви будете перенаправлені на сторінку monobank у новій вкладці.</p>
+            {result && (
+              <div className="p-3 rounded-md bg-slate-100 dark:bg-slate-800 flex justify-between">
+                <span className="text-muted-foreground">Сума до сплати:</span>
+                <span className="font-semibold">{result.total.toLocaleString("uk-UA")} грн</span>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowPaymentDialog(false)}>
+              Скасувати
+            </Button>
+            <Button onClick={handleMonobankRedirect}>Оплатити через Monobank</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

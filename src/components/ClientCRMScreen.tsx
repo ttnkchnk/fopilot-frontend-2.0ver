@@ -98,7 +98,7 @@ export function ClientCRMScreen() {
   };
 
   return (
-    <div className="h-full overflow-auto bg-background">
+    <div className="h-full overflow-auto bg-gradient-to-br from-blue-50/70 via-indigo-50/40 to-slate-50/60 dark:from-gray-950 dark:via-blue-950/20 dark:to-purple-950/10">
       <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
@@ -261,7 +261,7 @@ export function ClientCRMScreen() {
                 <Building2 className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                 <Input
                   id="company-name"
-                  placeholder="TechCorp Inc."
+                  placeholder="ТОВ «Приклад»"
                   value={newClient.name}
                   onChange={(e) => setNewClient({ ...newClient, name: e.target.value })}
                   className="pl-10"
@@ -273,7 +273,7 @@ export function ClientCRMScreen() {
               <Label htmlFor="country">Країна</Label>
               <Input
                 id="country"
-                placeholder="США, Німеччина, Польща..."
+                placeholder="Україна, Польща, Німеччина..."
                 value={newClient.country}
                 onChange={(e) => setNewClient({ ...newClient, country: e.target.value })}
               />
@@ -287,7 +287,7 @@ export function ClientCRMScreen() {
                   <Input
                     id="email"
                     type="email"
-                    placeholder="contact@company.com"
+                    placeholder="client@example.com"
                     value={newClient.email}
                     onChange={(e) => setNewClient({ ...newClient, email: e.target.value })}
                     className="pl-10"
@@ -302,7 +302,7 @@ export function ClientCRMScreen() {
                   <Input
                     id="phone"
                     type="tel"
-                    placeholder="+1 555 0123"
+                    placeholder="+38 050 123 45 67"
                     value={newClient.phone}
                     onChange={(e) => setNewClient({ ...newClient, phone: e.target.value })}
                     className="pl-10"
@@ -317,7 +317,7 @@ export function ClientCRMScreen() {
                 <MapPin className="absolute left-3 top-3 text-muted-foreground w-4 h-4" />
                 <Textarea
                   id="address"
-                  placeholder="123 Main Street, City, Country"
+                  placeholder="вул. Хрещатик, 1, Київ"
                   value={newClient.address}
                   onChange={(e) => setNewClient({ ...newClient, address: e.target.value })}
                   className="pl-10 min-h-[60px]"
@@ -332,7 +332,7 @@ export function ClientCRMScreen() {
                 <CreditCard className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                 <Input
                   id="iban"
-                  placeholder="GB29 NWBK 6016 1331 9268 19"
+                  placeholder="UA123456789012345678901234567"
                   value={newClient.iban}
                   onChange={(e) => setNewClient({ ...newClient, iban: e.target.value })}
                   className="pl-10"

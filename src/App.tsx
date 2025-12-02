@@ -19,6 +19,7 @@ import { KnowledgeBaseScreen } from "./components/KnowledgeBaseScreen";
 import { CurrencyDashboard } from "./components/CurrencyDashboard";
 import { ClientCRMScreen } from "./components/ClientCRMScreen";
 import { ArticleDetailScreen } from "./components/ArticleDetailScreen";
+import { LegalDigestScreen } from "./components/LegalDigestScreen";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { isAuthenticated, logoutBackend } from "./services/authApi";
 import { fetchCurrentUser, User } from "./services/userService";
@@ -137,6 +138,7 @@ export default function App() {
             <Route path="/knowledge/:id" element={<ArticleDetailScreen />} />
             <Route path="/currency-dashboard" element={<CurrencyDashboard />} />
             <Route path="/client-crm" element={<ClientCRMScreen />} />
+            <Route path="/legal-digest" element={<LegalDigestScreen />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Layout>

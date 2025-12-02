@@ -11,9 +11,12 @@ import {
   DollarSign,
   Receipt,
   TrendingDown,
+  ExternalLink,
+  Calendar as CalendarIcon,
 } from "lucide-react";
 import { fetchIncomes } from "../services/incomeService";
 import { fetchExpenses } from "../services/expenseService";
+import { fetchMonthlyDigest, type LegalDigestItem, type MonthlyDigestResponse } from "../services/legalService";
 import { toast } from "sonner";
 
 type DashboardScreenProps = {
@@ -26,6 +29,12 @@ export function DashboardScreen({ userName }: DashboardScreenProps) {
   const [quarterExpenses, setQuarterExpenses] = useState(0);
   const [singleTax, setSingleTax] = useState(0);
   const [socialTax, setSocialTax] = useState(0);
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  });
+  const [digest, setDigest] = useState<MonthlyDigestResponse | null>(null);
+  const [digestLoading, setDigestLoading] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -49,13 +58,42 @@ export function DashboardScreen({ userName }: DashboardScreenProps) {
     load();
   }, []);
 
+  useEffect(() => {
+    const loadDigest = async () => {
+      setDigestLoading(true);
+      try {
+        const [year, month] = selectedMonth.split("-").map((n) => parseInt(n, 10));
+        const data = await fetchMonthlyDigest(year, month);
+        setDigest(data);
+      } catch (error) {
+        console.error(error);
+        toast.error("Не вдалося завантажити правовий дайджест");
+      } finally {
+        setDigestLoading(false);
+      }
+    };
+
+    loadDigest();
+  }, [selectedMonth]);
+
   const totalTax = singleTax + socialTax;
+
+  const importanceTone = (importance: LegalDigestItem["importance"]) => {
+    switch (importance) {
+      case "high":
+        return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-200";
+      case "medium":
+        return "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-200";
+      default:
+        return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-200";
+    }
+  };
 
   return (
     <div className="h-full overflow-auto bg-gradient-to-br from-blue-50/80 via-sky-50/50 to-indigo-50/60 dark:from-gray-900 dark:via-gray-950 dark:to-blue-950/20">
       <div className="p-4 md:p-6 space-y-6">
         {/* Header */}
-        <div className="bg-card rounded-lg border p-4 md:p-6">
+        <div className="p-4 md:p-6">
           <div className="flex items-center gap-3 mb-2">
             <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
               <LayoutDashboard className="w-5 h-5 text-blue-600 dark:text-blue-400" />
@@ -311,6 +349,69 @@ export function DashboardScreen({ userName }: DashboardScreenProps) {
               </div>
             </CardContent>
           </Card>
+        </div>
+
+        {/* Legal digest */}
+        <div className="p-4 md:p-6 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <div className="w-10 h-10 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                <CalendarIcon className="w-5 h-5 text-amber-700 dark:text-amber-200" />
+              </div>
+              <div>
+                <h3 className="text-base md:text-lg">Зміни в законодавстві для ФОП</h3>
+                <p className="text-sm text-muted-foreground">Дайджест за обраний місяць</p>
+              </div>
+            </div>
+            <label className="flex items-center gap-2 text-sm">
+              <span className="text-muted-foreground">Місяць</span>
+              <input
+                type="month"
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="rounded-md border px-3 py-2 bg-background text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              />
+            </label>
+          </div>
+
+          {digestLoading ? (
+            <p className="text-sm text-muted-foreground">Завантаження дайджесту…</p>
+          ) : digest && digest.items.length > 0 ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {digest.items.map((item) => (
+                <Card key={item.id} className="h-full">
+                  <CardHeader className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <span>{new Date(item.date).toLocaleDateString("uk-UA")}</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800">
+                        {item.topic ?? "—"}
+                      </span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${importanceTone(item.importance)}`}>
+                        {item.importance === "high" ? "Важливо" : item.importance === "medium" ? "Середньо" : "Низько"}
+                      </span>
+                    </div>
+                    <CardTitle className="text-base">{item.title}</CardTitle>
+                    <CardDescription className="line-clamp-3">{item.summary}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">{item.source}</span>
+                    <Button
+                      asChild
+                      size="sm"
+                      variant="secondary"
+                      className="gap-2"
+                    >
+                      <a href={item.url} target="_blank" rel="noreferrer">
+                        Детальніше <ExternalLink className="w-4 h-4" />
+                      </a>
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">Немає оновлень за цей період.</p>
+          )}
         </div>
       </div>
     </div>
