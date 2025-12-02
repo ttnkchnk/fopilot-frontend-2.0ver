@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Save, Sparkles, FileCheck, AlertCircle, CheckCircle2, XCircle, ArrowLeft } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -16,6 +16,10 @@ import {
   DialogTitle,
 } from "./ui/dialog";
 import { DigitalSignatureDialog } from "./DigitalSignatureDialog";
+import api from "../lib/api";
+import { toast } from "sonner";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 interface DeclarationRow {
   code: string;
@@ -24,19 +28,27 @@ interface DeclarationRow {
 }
 
 export function DeclarationScreen() {
-  const [declarationData, setDeclarationData] = useState<DeclarationRow[]>([
-    { code: "01", label: "Прізвище, ім'я, по батькові", value: "" },
-    { code: "02", label: "Реєстраційний номер облікової картки платника податків", value: "" },
-    { code: "03", label: "Звітний (податковий) період", value: "I квартал 2025" },
-    { code: "10", label: "Дохід від провадження господарської діяльності", value: "0.00" },
-    { code: "11", label: "Дохід від надання майна в оренду", value: "0.00" },
-    { code: "12", label: "Сума отриманого доходу (сумарно)", value: "0.00" },
-    { code: "20", label: "Ставка єдиного податку (%)", value: "5" },
-    { code: "21", label: "Сума нарахованого єдиного податку", value: "0.00" },
-    { code: "30", label: "Єдиний внесок (ЄСВ) за себе", value: "0.00" },
-    { code: "31", label: "Єдиний внесок (ЄСВ) за найманих працівників", value: "0.00" },
-    { code: "40", label: "Загальна сума до сплати", value: "0.00" }
-  ]);
+  const initialRows: DeclarationRow[] = useMemo(() => [
+      { code: "01", label: "Прізвище, ім'я, по батькові", value: "" },
+      { code: "02", label: "Реєстраційний номер облікової картки платника податків", value: "" },
+      { code: "03", label: "Звітний (податковий) період", value: "" },
+      { code: "10", label: "Дохід від провадження господарської діяльності", value: "0.00" },
+      { code: "11", label: "Дохід від надання майна в оренду", value: "0.00" },
+      { code: "12", label: "Сума отриманого доходу (сумарно)", value: "0.00" },
+      { code: "20", label: "Ставка єдиного податку (%)", value: "5" },
+      { code: "21", label: "Сума нарахованого єдиного податку", value: "0.00" },
+      { code: "30", label: "Єдиний внесок (ЄСВ) за себе", value: "0.00" },
+      { code: "31", label: "Єдиний внесок (ЄСВ) за найманих працівників", value: "0.00" },
+      { code: "40", label: "Загальна сума до сплати", value: "0.00" }
+    ], []);
+  const [declarationData, setDeclarationData] = useState<DeclarationRow[]>(initialRows);
+  const [isLoadingPrefill, setIsLoadingPrefill] = useState(false);
+  const [prefillError, setPrefillError] = useState<string | null>(null);
+  const [submitLoading, setSubmitLoading] = useState(false);
+  const [currentPeriod, setCurrentPeriod] = useState<{ year: number; quarter: number }>(() => {
+    const now = new Date();
+    return { year: now.getFullYear(), quarter: Math.floor(now.getMonth() / 3) + 1 };
+  });
 
   const [isAIChecking, setIsAIChecking] = useState(false);
   const [showAIDialog, setShowAIDialog] = useState(false);
@@ -80,6 +92,119 @@ export function DeclarationScreen() {
     alert("Чернетку збережено");
   };
 
+  const loadPrefill = async () => {
+    setIsLoadingPrefill(true);
+    setPrefillError(null);
+    const now = new Date();
+    const quarter = Math.floor(now.getMonth() / 3) + 1;
+    const year = now.getFullYear();
+    try {
+      const { data } = await api.get("/forms/declaration/3-group/prefill", {
+        params: { year, quarter },
+      });
+
+      const money = (val: number) => (val ?? 0).toFixed(2);
+      const period = data.period_text ?? `Q${quarter} ${year}`;
+
+      setCurrentPeriod({ year: data.year ?? year, quarter: data.quarter ?? quarter });
+      setDeclarationData((prev) =>
+        prev.map((row) => {
+          switch (row.code) {
+            case "01":
+              return { ...row, value: data.full_name ?? row.value };
+            case "02":
+              return { ...row, value: data.tax_id ?? row.value };
+            case "03":
+              return { ...row, value: period };
+            case "10":
+            case "12":
+              return { ...row, value: money(data.total_income) };
+            case "21":
+              return { ...row, value: money(data.single_tax) };
+            case "40": {
+              const total = (data.single_tax ?? 0) + parseFloat(row.value || "0");
+              return { ...row, value: money(total) };
+            }
+            default:
+              return row;
+          }
+        })
+      );
+    } catch (error) {
+      console.error("Не вдалося завантажити автозаповнення декларації", error);
+      setPrefillError("Не вдалося підставити дані автоматично. Заповніть поля вручну.");
+    } finally {
+      setIsLoadingPrefill(false);
+    }
+  };
+
+  useEffect(() => {
+    loadPrefill();
+  }, []);
+
+  const getValue = (code: string) => declarationData.find((row) => row.code === code)?.value ?? "";
+  const parseNumber = (val: string | number | undefined) => {
+    const num = typeof val === "number" ? val : parseFloat(val || "0");
+    return isNaN(num) ? 0 : num;
+  };
+
+  const handleSubmitDeclaration = async () => {
+    setSubmitLoading(true);
+    try {
+      // 1. Локальний PDF
+      const pdf = buildPdf();
+      const filename = `declaration_${currentPeriod.year}_Q${currentPeriod.quarter}.pdf`;
+      pdf.save(filename);
+
+      // 2. Відправка в архів
+      const dataUri = pdf.output("datauristring");
+      await api.post("/documents/upload", {
+        file_name: filename,
+        pdf_base64: dataUri,
+        type: "declaration",
+        year: currentPeriod.year,
+        quarter: currentPeriod.quarter,
+      });
+
+      toast.success("Декларацію збережено та додано до архіву");
+      setShowSignDialog(false);
+    } catch (error) {
+      console.error("Не вдалося подати декларацію", error);
+      toast.error("Не вдалося подати декларацію");
+    } finally {
+      setSubmitLoading(false);
+    }
+  };
+
+  const buildPdf = () => {
+    const doc = new jsPDF();
+    const title = "Податкова декларація платника єдиного податку (III група)";
+    const quarterText = ["", "I", "II", "III", "IV"][currentPeriod.quarter] || "";
+    doc.setFontSize(14);
+    doc.text(title, 14, 16);
+
+    doc.setFontSize(11);
+    doc.text(`ПІБ: ${getValue("01")}`, 14, 28);
+    doc.text(`РНОКПП: ${getValue("02")}`, 14, 36);
+    doc.text(`Період: ${quarterText} квартал ${currentPeriod.year} року`, 14, 44);
+    doc.text(`Дата заповнення: ${getValue("filled_date") || new Date().toLocaleDateString("uk-UA")}`, 14, 52);
+
+    autoTable(doc, {
+      head: [["Показник", "Сума, грн"]],
+      body: [
+        ["Сума доходу за період", parseNumber(getValue("12") || getValue("10")).toFixed(2)],
+        ["Сума єдиного податку (5%)", parseNumber(getValue("21")).toFixed(2)],
+        ["ЄСВ за себе", parseNumber(getValue("30")).toFixed(2)],
+        ["Загальна сума до сплати", (parseNumber(getValue("21")) + parseNumber(getValue("30"))).toFixed(2)],
+      ],
+      startY: 64,
+      styles: { fontSize: 10 },
+      headStyles: { fillColor: [240, 240, 240] },
+    });
+
+    return doc;
+  };
+
   const isMoneyField = (code: string) => {
     return ["10", "11", "12", "21", "30", "31", "40"].includes(code);
   };
@@ -113,6 +238,12 @@ export function DeclarationScreen() {
             Використовуйте кнопку "Перевірити з AI" для автоматичної перевірки даних перед поданням
           </AlertDescription>
         </Alert>
+        {prefillError && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="text-sm">{prefillError}</AlertDescription>
+          </Alert>
+        )}
 
         {/* Form Paper */}
         <Card className="bg-white dark:bg-card shadow-lg">
@@ -207,13 +338,22 @@ export function DeclarationScreen() {
             <Save className="w-4 h-4 mr-2" />
             Зберегти чернетку
           </Button>
+          <Button
+            variant="outline"
+            onClick={handleSubmitDeclaration}
+            className="w-full sm:w-auto"
+            disabled={submitLoading}
+          >
+            <FileCheck className="w-4 h-4 mr-2" />
+            {submitLoading ? "Генерую..." : "Завантажити PDF + Архів"}
+          </Button>
           <Button variant="outline" onClick={handleAICheck} disabled={isAIChecking} className="w-full sm:w-auto">
             <Sparkles className="w-4 h-4 mr-2" />
             {isAIChecking ? "Перевіряю..." : "Перевірити з AI"}
           </Button>
-          <Button onClick={() => setShowSignDialog(true)} className="w-full sm:w-auto">
+          <Button onClick={() => setShowSignDialog(true)} className="w-full sm:w-auto" disabled={isLoadingPrefill}>
             <FileCheck className="w-4 h-4 mr-2" />
-            Підписати та подати
+            {isLoadingPrefill ? "Підтягуємо дані..." : "Підписати та подати"}
           </Button>
         </div>
       </div>
@@ -268,10 +408,9 @@ export function DeclarationScreen() {
       <DigitalSignatureDialog
         open={showSignDialog}
         onOpenChange={setShowSignDialog}
-        onSign={() => {
-          alert("Декларацію підписано та подано!");
-        }}
+        onSign={handleSubmitDeclaration}
       />
+
     </div>
   );
 }

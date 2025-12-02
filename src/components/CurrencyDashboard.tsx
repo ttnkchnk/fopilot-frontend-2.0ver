@@ -76,9 +76,12 @@ const salesHistory: SaleRecord[] = [
 // Mock chart data for the last 30 days
 const chartData = Array.from({ length: 30 }, (_, i) => ({
   day: i + 1,
-  usd: 39.5 + Math.random() * 2,
-  eur: 43.0 + Math.random() * 2
+  usd: 39.5 + Math.sin(i / 5) * 0.4 + Math.random() * 0.15,
+  eur: 43.0 + Math.cos(i / 6) * 0.4 + Math.random() * 0.15,
 }));
+
+const lastTrend = (key: "usd" | "eur", days = 7) =>
+  chartData.slice(-days).map((d) => d[key]);
 
 export function CurrencyDashboard() {
   const [selectedCurrency, setSelectedCurrency] = useState<"USD" | "EUR">("USD");
@@ -89,15 +92,25 @@ export function CurrencyDashboard() {
   const exchangeRates: ExchangeRate[] = [
     {
       currency: "USD",
-      rate: rates?.USD ?? 41.25,
-      change: 0,
-      trend: [rates?.USD ?? 41.25],
+      rate: rates?.USD ?? chartData.at(-1)?.usd ?? 41.25,
+      change: (() => {
+        const series = lastTrend("usd");
+        const start = series.at(0) ?? 1;
+        const end = series.at(-1) ?? start;
+        return +(((end - start) / start) * 100).toFixed(2);
+      })(),
+      trend: lastTrend("usd"),
     },
     {
       currency: "EUR",
-      rate: rates?.EUR ?? 44.8,
-      change: 0,
-      trend: [rates?.EUR ?? 44.8],
+      rate: rates?.EUR ?? chartData.at(-1)?.eur ?? 44.8,
+      change: (() => {
+        const series = lastTrend("eur");
+        const start = series.at(0) ?? 1;
+        const end = series.at(-1) ?? start;
+        return +(((end - start) / start) * 100).toFixed(2);
+      })(),
+      trend: lastTrend("eur"),
     },
   ];
 
@@ -124,15 +137,24 @@ export function CurrencyDashboard() {
   };
 
   const Sparkline = ({ data, color }: { data: number[]; color: string }) => {
-    const max = Math.max(...data);
-    const min = Math.min(...data);
-    const range = max - min;
-    
-    const points = data.map((value, index) => {
-      const x = (index / (data.length - 1)) * 100;
-      const y = 100 - ((value - min) / range) * 100;
-      return `${x},${y}`;
-    }).join(' ');
+    if (!data.length) {
+      return <div className="w-full h-8" />;
+    }
+
+    const max = Math.max(...data.map((n) => (Number.isFinite(n) ? n : 0)));
+    const min = Math.min(...data.map((n) => (Number.isFinite(n) ? n : 0)));
+    const range = max - min || 1; // avoid division by zero
+    const lastY = 100 - ((data[data.length - 1] - min) / range) * 100;
+
+    const points = data
+      .map((value, index) => {
+        const x = data.length === 1 ? 100 : (index / (data.length - 1)) * 100;
+        const y = isFinite(range) && Number.isFinite(value)
+          ? 100 - ((value - min) / range) * 100
+          : lastY;
+        return `${x},${y}`;
+      })
+      .join(" ");
 
     return (
       <svg viewBox="0 0 100 30" className="w-full h-8" preserveAspectRatio="none">
@@ -227,8 +249,8 @@ export function CurrencyDashboard() {
                       </span>
                       <span className="text-slate-400 mb-2">₴</span>
                     </div>
-                    <div className="bg-slate-950/50 rounded-lg p-2">
-                      <Sparkline data={rate.trend} color={isPositive ? "#10b981" : "#ef4444"} />
+                    <div className="bg-slate-900/70 rounded-lg p-2">
+                      <Sparkline data={rate.trend} color={isPositive ? "#22d3ee" : "#ef4444"} />
                     </div>
                     <p className="text-xs text-slate-500">Тренд за останні 7 днів</p>
                   </div>

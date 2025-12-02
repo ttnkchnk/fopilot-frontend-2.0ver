@@ -1,53 +1,53 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Button } from "./ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
-import { Upload, File, Trash2, Download, FileText } from "lucide-react";
-import { toast } from "sonner@2.0.3";
+import { Upload, File, Trash2, Download, FileText, ArchiveRestore, Archive } from "lucide-react";
+import { toast } from "sonner";
+import api from "../lib/api";
 
-interface Document {
+interface DocumentMeta {
   id: string;
-  name: string;
+  userId: string;
   type: string;
-  size: number;
-  uploadDate: string;
-  category: string;
+  fileName: string;
+  filePath: string;
+  createdAt?: string;
+  year?: number | null;
+  quarter?: number | null;
+  category?: string | null;
+  archived?: boolean;
 }
 
 export function DocumentsScreen() {
-  const [documents, setDocuments] = useState<Document[]>([]);
+  const [documents, setDocuments] = useState<DocumentMeta[]>([]);
   const [category, setCategory] = useState("");
+  const [search, setSearch] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
+
+  const suggestedCategories = useMemo(() => {
+    const base = ["Договори", "Податки", "Акти", "Квитанції", "Інше"];
+    const fromDocs = documents
+      .map((d) => d.category)
+      .filter((c): c is string => Boolean(c))
+      .map((c) => c.trim());
+    return Array.from(new Set([...base, ...fromDocs])).filter(Boolean);
+  }, [documents]);
+
+  const loadDocuments = async () => {
+    try {
+      const { data } = await api.get<DocumentMeta[]>("/documents");
+      setDocuments(data);
+    } catch (error) {
+      console.error("Не вдалося отримати документи", error);
+      toast.error("Не вдалося завантажити документи");
+    }
+  };
 
   useEffect(() => {
-    // Load documents from localStorage
-    const storedDocuments = localStorage.getItem("fopilot-documents");
-    if (storedDocuments) {
-      setDocuments(JSON.parse(storedDocuments));
-    } else {
-      // Default sample data
-      const defaultDocuments = [
-        {
-          id: "1",
-          name: "Договір_оренди_2024.pdf",
-          type: "application/pdf",
-          size: 245000,
-          uploadDate: new Date().toISOString(),
-          category: "Договори",
-        },
-        {
-          id: "2",
-          name: "Квитанція_єдиний_податок_Q3.pdf",
-          type: "application/pdf",
-          size: 125000,
-          uploadDate: new Date().toISOString(),
-          category: "Податки",
-        },
-      ];
-      setDocuments(defaultDocuments);
-      localStorage.setItem("fopilot-documents", JSON.stringify(defaultDocuments));
-    }
+    loadDocuments();
   }, []);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -67,39 +67,40 @@ export function DocumentsScreen() {
       return;
     }
 
-    const newDocument: Document = {
-      id: Date.now().toString(),
-      name: file.name,
-      type: file.type,
-      size: file.size,
-      uploadDate: new Date().toISOString(),
-      category: category.trim(),
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const base64 = reader.result as string;
+        await api.post("/documents/upload", {
+          file_name: file.name,
+          pdf_base64: base64,
+          type: category.trim(),
+          category: category.trim(),
+        });
+        toast.success(`Документ "${file.name}" успішно завантажено`);
+        setCategory("");
+        e.target.value = "";
+        loadDocuments();
+      } catch (error) {
+        console.error("Не вдалося завантажити документ", error);
+        toast.error("Не вдалося завантажити документ");
+      }
     };
-
-    const updatedDocuments = [newDocument, ...documents];
-    setDocuments(updatedDocuments);
-    localStorage.setItem("fopilot-documents", JSON.stringify(updatedDocuments));
-    setCategory("");
-    
-    // Reset file input
-    e.target.value = "";
-    
-    toast.success(`Документ "${file.name}" успішно завантажено`);
+    reader.onerror = () => {
+      toast.error("Не вдалося прочитати файл");
+    };
+    reader.readAsDataURL(file);
   };
 
-  const handleDeleteDocument = (id: string) => {
-    const updatedDocuments = documents.filter((doc) => doc.id !== id);
-    setDocuments(updatedDocuments);
-    localStorage.setItem("fopilot-documents", JSON.stringify(updatedDocuments));
-    toast.success("Документ видалено");
-  };
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return "0 Bytes";
-    const k = 1024;
-    const sizes = ["Bytes", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + " " + sizes[i];
+  const handleDeleteDocument = async (id: string) => {
+    try {
+      await api.delete(`/documents/${id}`);
+      toast.success("Документ видалено");
+      loadDocuments();
+    } catch (error) {
+      console.error("Не вдалося видалити", error);
+      toast.error("Не вдалося видалити документ");
+    }
   };
 
   const getFileIcon = (type: string) => {
@@ -110,20 +111,83 @@ export function DocumentsScreen() {
     return <File className="w-5 h-5 text-gray-600" />;
   };
 
+  const formatDate = (val?: string) => {
+    if (!val) return "-";
+    const d = new Date(val);
+    return isNaN(d.getTime())
+      ? "-"
+      : d.toLocaleDateString("uk-UA", { day: "2-digit", month: "2-digit", year: "numeric" });
+  };
+
+  const filteredDocs = useMemo(() => {
+    return documents.filter((doc) => {
+      const matchesArchive = showArchived ? doc.archived : !doc.archived;
+      const haystack = `${doc.fileName} ${doc.category ?? ""} ${doc.type ?? ""}`.toLowerCase();
+      const matchesSearch = haystack.includes(search.toLowerCase().trim());
+      return matchesArchive && matchesSearch;
+    });
+  }, [documents, showArchived, search]);
+
+  const toggleArchive = async (doc: DocumentMeta) => {
+    try {
+      await api.patch(`/documents/${doc.id}/archive`, { archived: !doc.archived });
+      toast.success(doc.archived ? "Повернуто з архіву" : "Переміщено в архів");
+      loadDocuments();
+    } catch (error) {
+      console.error("Не вдалося оновити документ", error);
+      toast.error("Не вдалося змінити статус документа");
+    }
+  };
+
+  const handleDownload = async (doc: DocumentMeta) => {
+    try {
+      const response = await api.get(`/documents/${doc.id}/download`, { responseType: "blob" });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = doc.fileName || "document.pdf";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Не вдалося скачати документ", error);
+      toast.error("Не вдалося скачати документ");
+    }
+  };
+
   return (
     <div className="h-full overflow-auto bg-background">
       <div className="max-w-5xl mx-auto p-4 md:p-6 space-y-4 md:space-y-6">
         {/* Header */}
         <div className="bg-card rounded-lg border p-4 md:p-6">
-          <div className="flex items-center gap-3 mb-2">
+          <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
               <FileText className="w-5 h-5 text-purple-600 dark:text-purple-400" />
             </div>
-            <h1 className="text-lg md:text-xl">Документи</h1>
+            <div>
+              <h1 className="text-lg md:text-xl">Документи</h1>
+              <p className="text-muted-foreground text-sm md:text-base">
+                Зберігайте, завантажуйте та архівуйте файли
+              </p>
+            </div>
           </div>
-          <p className="text-muted-foreground text-sm md:text-base">
-            Зберігайте та організовуйте всі важливі документи
-          </p>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+            <Input
+              placeholder="Пошук за назвою / категорією"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full sm:w-64"
+            />
+            <Button
+              variant={showArchived ? "default" : "outline"}
+              onClick={() => setShowArchived((v) => !v)}
+              className="w-full sm:w-auto"
+            >
+              {showArchived ? <ArchiveRestore className="w-4 h-4 mr-2" /> : <Archive className="w-4 h-4 mr-2" />}
+              {showArchived ? "Показати активні" : "Показати архів"}
+            </Button>
+          </div>
         </div>
 
         {/* Upload Form */}
@@ -144,8 +208,14 @@ export function DocumentsScreen() {
                     type="text"
                     placeholder="Договори, Податки, Акти..."
                     value={category}
+                    list="category-options"
                     onChange={(e) => setCategory(e.target.value)}
                   />
+                  <datalist id="category-options">
+                    {suggestedCategories.map((opt) => (
+                      <option key={opt} value={opt} />
+                    ))}
+                  </datalist>
                 </div>
 
                 <div className="space-y-2">
@@ -175,7 +245,7 @@ export function DocumentsScreen() {
           <CardHeader>
             <CardTitle className="text-lg md:text-xl">Мої документи</CardTitle>
             <CardDescription className="text-sm md:text-base">
-              Всього документів: {documents.length}
+              Всього документів: {documents.length} | Показано: {filteredDocs.length}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -186,47 +256,49 @@ export function DocumentsScreen() {
                     <TableHead className="w-12"></TableHead>
                     <TableHead>Назва</TableHead>
                     <TableHead>Категорія</TableHead>
-                    <TableHead>Розмір</TableHead>
+                    <TableHead>Статус</TableHead>
                     <TableHead>Дата завантаження</TableHead>
                     <TableHead className="text-right">Дії</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {documents.length === 0 ? (
+                  {filteredDocs.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                        Немає завантажених документів
+                        Немає документів
                       </TableCell>
                     </TableRow>
                   ) : (
-                    documents.map((doc) => (
+                    filteredDocs.map((doc) => (
                       <TableRow key={doc.id}>
                         <TableCell>
                           <div className="flex items-center justify-center">
-                            {getFileIcon(doc.type)}
+                            {getFileIcon(doc.type || "")}
                           </div>
                         </TableCell>
                         <TableCell className="max-w-[200px] truncate">
-                          {doc.name}
+                          {doc.fileName}
                         </TableCell>
-                        <TableCell>{doc.category}</TableCell>
-                        <TableCell>{formatFileSize(doc.size)}</TableCell>
-                        <TableCell>
-                          {new Date(doc.uploadDate).toLocaleDateString("uk-UA", {
-                            day: "2-digit",
-                            month: "2-digit",
-                            year: "numeric",
-                          })}
-                        </TableCell>
+                        <TableCell>{doc.category || doc.type}</TableCell>
+                        <TableCell>{doc.archived ? "Архів" : "Активний"}</TableCell>
+                        <TableCell>{formatDate(doc.createdAt)}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
                             <Button
                               variant="ghost"
                               size="sm"
                               className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/30"
-                              onClick={() => toast.info("Функція завантаження буде доступна після інтеграції з сервером")}
+                              onClick={() => handleDownload(doc)}
                             >
                               <Download className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => toggleArchive(doc)}
+                              className="text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+                            >
+                              {doc.archived ? <ArchiveRestore className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
                             </Button>
                             <Button
                               variant="ghost"

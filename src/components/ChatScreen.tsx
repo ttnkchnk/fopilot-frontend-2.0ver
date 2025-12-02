@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "./ui/button";
-import { Send, Sparkles } from "lucide-react";
+import { Send, Sparkles, FileText, Calculator, Wallet } from "lucide-react";
 import { fetchChatHistory, sendChatMessage, type ChatMessage } from "../services/chatService";
 import { toast } from "sonner";
 
@@ -35,6 +35,11 @@ export function ChatScreen() {
   const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const quickPrompts = [
+    { id: "decl", label: "Створи декларацію", text: "Створи декларацію за поточний квартал", icon: FileText },
+    { id: "income", label: "Додай дохід", text: "Додай дохід 5000 грн за сьогодні (консультація)", icon: Wallet },
+    { id: "tax", label: "Порахуй податки", text: "Порахуй скільки податків сплатити цього кварталу", icon: Calculator },
+  ];
 
   useEffect(() => {
     const loadHistory = async () => {
@@ -95,18 +100,21 @@ export function ChatScreen() {
     }
   }, [messages, isTyping]);
 
-  const handleSend = async () => {
-    if (!inputValue.trim()) return;
+  const handleSend = async (textOverride?: string) => {
+    const textToSend = (typeof textOverride === "string" ? textOverride : inputValue ?? "").toString();
+    if (!textToSend.trim()) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
-      text: inputValue,
+      text: textToSend,
       sender: "user",
       timestamp: new Date(),
     };
 
     setMessages((prev) => [...prev, userMessage]);
-    setInputValue("");
+    if (!textOverride) {
+      setInputValue("");
+    }
     setIsTyping(true);
 
     try {
@@ -117,8 +125,18 @@ export function ChatScreen() {
         text: reply,
         sender: "bot",
         timestamp: new Date(),
+        isTyping: true,
       };
       setMessages((prev) => [...prev, botMessage]);
+
+      const typingDuration = Math.min(5000, Math.max(1200, reply.length * 30));
+      setTimeout(() => {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === botMessage.id ? { ...m, isTyping: false } : m
+          )
+        );
+      }, typingDuration);
     } catch (error) {
       console.error(error);
       setIsTyping(false);
@@ -131,6 +149,12 @@ export function ChatScreen() {
       e.preventDefault();
       handleSend();
     }
+  };
+
+  const handleQuickPrompt = (text: string) => {
+    if (isTyping) return;
+    setInputValue(text);
+    handleSend(text);
   };
 
   // Group messages by time
@@ -201,16 +225,17 @@ export function ChatScreen() {
 
                 {/* Bubble */}
                 <div
-                  className={`group relative max-w-[75%] sm:max-w-[60%] px-4 py-2.5 shadow-sm transition-all duration-200 ${
+                  className={`group relative max-w-[75%] sm:max-w-[60%] px-4 py-2.5 shadow-sm transition-all duration-500 ${
                     message.sender === "user"
-                      ? "bg-[#007AFF] text-white rounded-[20px] rounded-br-[4px]"
-                      : "bg-[#E9E9EB] dark:bg-[#3A3A3C] text-[#000000] dark:text-[#FFFFFF] rounded-[20px] rounded-bl-[4px]"
+                      ? "bg-blue-500/60 text-white rounded-2xl rounded-br-md backdrop-blur-md"
+                      : "bg-slate-200/80 dark:bg-slate-800/50 text-slate-900 dark:text-slate-50 rounded-2xl rounded-bl-md backdrop-blur-sm"
                   }`}
                   style={{
-                    wordBreak: 'break-word',
-                    boxShadow: message.sender === "user" 
-                      ? "0 1px 2px rgba(0, 122, 255, 0.2)" 
-                      : "0 1px 2px rgba(0, 0, 0, 0.1)"
+                    wordBreak: "break-word",
+                    boxShadow:
+                      message.sender === "user"
+                        ? "0 8px 28px rgba(37, 99, 235, 0.22)"
+                        : "0 8px 24px rgba(0,0,0,0.10)",
                   }}
                 >
                   {message.isTyping && message.sender === "bot" ? (
@@ -255,6 +280,21 @@ export function ChatScreen() {
 
       {/* Input Area - iMessage Style */}
       <div className="flex-shrink-0 px-4 py-2.5 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-t border-gray-200 dark:border-gray-800">
+        <div className="max-w-4xl mx-auto mb-2 flex flex-wrap gap-2">
+          {quickPrompts.map((prompt) => (
+            <Button
+              key={prompt.id}
+              variant="secondary"
+              size="sm"
+              onClick={() => handleQuickPrompt(prompt.text)}
+              disabled={isTyping}
+              className="text-xs sm:text-sm rounded-2xl bg-slate-100/90 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 hover:-translate-y-0.5 shadow-sm hover:shadow transition-all flex items-center gap-2"
+            >
+              {prompt.icon && <prompt.icon className="w-3.5 h-3.5 text-slate-600 dark:text-slate-200" />}
+              {prompt.label}
+            </Button>
+          ))}
+        </div>
         <div className="flex items-end gap-2 max-w-4xl mx-auto">
           {/* Input Container */}
           <div className="flex-1 relative">
@@ -277,7 +317,7 @@ export function ChatScreen() {
 
           {/* Send Button - iMessage Style */}
           <button
-            onClick={handleSend}
+            onClick={() => handleSend()}
             disabled={isTyping || !inputValue.trim()}
             className="w-9 h-9 rounded-full bg-[#007AFF] hover:bg-[#0051D5] disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-center shadow-lg transition-all duration-200 active:scale-95 flex-shrink-0"
             style={{

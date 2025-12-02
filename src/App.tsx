@@ -9,6 +9,7 @@ import { ProfileScreen } from "./components/ProfileScreen";
 import { IncomeScreen } from "./components/IncomeScreen";
 import { ExpensesScreen } from "./components/ExpensesScreen";
 import { DocumentsScreen } from "./components/DocumentsScreen";
+import { ArchiveScreen } from "./components/ArchiveScreen";
 import { FormsHubScreen } from "./components/FormsHubScreen";
 import { DeclarationScreen } from "./components/DeclarationScreen";
 import { InvoiceScreen } from "./components/InvoiceScreen";
@@ -21,13 +22,25 @@ import { ArticleDetailScreen } from "./components/ArticleDetailScreen";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { isAuthenticated, logoutBackend } from "./services/authApi";
 import { fetchCurrentUser, User } from "./services/userService";
+import { auth } from "./lib/firebase";
+import { setAccessToken } from "./services/authToken";
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [initialized, setInitialized] = useState(false);
 
+  const ensureTokenFromFirebase = async () => {
+    // Якщо токену немає в localStorage, але є активний Firebase user — беремо idToken
+    if (isAuthenticated()) return;
+    if (auth.currentUser) {
+      const token = await auth.currentUser.getIdToken(true);
+      setAccessToken(token);
+    }
+  };
+
   const loadProfile = async () => {
     try {
+      await ensureTokenFromFirebase();
       if (!isAuthenticated()) {
         setUser(null);
       } else {
@@ -93,7 +106,7 @@ export default function App() {
       <BrowserRouter>
         <Layout
           onLogout={handleLogout}
-          userName={user ? user.first_name : undefined}
+          userName={user ? `${user.first_name} ${user.last_name}`.trim() : undefined}
         >
           <Routes>
             <Route
@@ -114,6 +127,7 @@ export default function App() {
             />
             <Route path="/expenses" element={<ExpensesScreen />} />
             <Route path="/documents" element={<DocumentsScreen />} />
+            <Route path="/archive" element={<ArchiveScreen />} />
             <Route path="/forms" element={<FormsHubScreen />} />
             <Route path="/forms/declaration" element={<DeclarationScreen />} />
             <Route path="/forms/invoice" element={<InvoiceScreen />} />

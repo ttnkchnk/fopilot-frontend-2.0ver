@@ -1,9 +1,16 @@
-import { ReactNode, useState } from "react";
-import { MessageSquare, Calculator, LogOut, User, Menu, TrendingUp, LayoutDashboard, TrendingDown, FileText, CalendarDays, FilePlus, HelpCircle, DollarSign, Users } from "lucide-react";
+import { ReactNode, useEffect, useState } from "react";
+import { MessageSquare, Calculator, LogOut, User, Menu, TrendingUp, LayoutDashboard, TrendingDown, FileText, CalendarDays, FilePlus, HelpCircle, DollarSign, Users, Archive, Bell } from "lucide-react";
 import { Button } from "./ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "./ui/sheet";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useNotifications } from "../hooks/useNotifications";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "./ui/popover";
+import { toast } from "sonner";
 
 interface LayoutProps {
   children: ReactNode;
@@ -15,6 +22,17 @@ export function Layout({ children, onLogout, userName }: LayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
+  const { next } = useNotifications();
+  const [notified, setNotified] = useState(false);
+
+  useEffect(() => {
+    if (next && !notified) {
+      toast.info(`${next.title}`, {
+        description: `Дедлайн ${next.deadline} — через ${next.daysLeft} дн.`,
+      });
+      setNotified(true);
+    }
+  }, [next, notified]);
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -27,27 +45,68 @@ export function Layout({ children, onLogout, userName }: LayoutProps) {
     <>
       <div className="p-6 flex items-center justify-between">
         <h1 className="text-blue-500">FOPilot</h1>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="rounded-full"
-          onClick={() => handleNavigate("/profile")}
-        >
-          <Avatar className="w-8 h-8 cursor-pointer">
-            <AvatarImage src="" alt="User" />
-            <AvatarFallback className="bg-blue-500 text-white text-sm">
-              {userName
-                ? userName
-                    .split(" ")
-                    .filter(Boolean)
-                    .slice(0, 2)
-                    .map((n) => n[0])
-                    .join("")
-                    .toUpperCase()
-                : "ІП"}
-            </AvatarFallback>
-          </Avatar>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="icon" className="rounded-full relative">
+                <Bell className="w-5 h-5" />
+                {next && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] rounded-full px-1">
+                    1
+                  </span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent
+              side="right"
+              align="start"
+              className="w-80 bg-gradient-to-br from-slate-900 to-slate-800 text-white border-slate-700 shadow-xl animate-in fade-in-0 zoom-in-95"
+            >
+              <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-slate-300 mb-1">
+                <span className="inline-block w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                Нагадування
+              </div>
+              {next ? (
+                <div className="space-y-1 text-sm">
+                  <div className="font-semibold text-white">{next.title}</div>
+                  <div className="text-slate-300 text-xs">Дедлайн {next.deadline}</div>
+                  <div className="text-slate-300 text-xs">Через {next.daysLeft} дн.</div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-3 border-amber-400 text-white hover:bg-amber-400 hover:text-slate-900"
+                    onClick={() => handleNavigate("/calendar")}
+                  >
+                    В календар
+                  </Button>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Найближчих дедлайнів немає</p>
+              )}
+            </PopoverContent>
+          </Popover>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="rounded-full"
+            onClick={() => handleNavigate("/profile")}
+          >
+            <Avatar className="w-8 h-8 cursor-pointer">
+              <AvatarImage src="" alt="User" />
+              <AvatarFallback className="bg-blue-500 text-white text-sm">
+                {userName
+                  ? userName
+                      .split(" ")
+                      .filter(Boolean)
+                      .slice(0, 2)
+                      .map((n) => n[0])
+                      .join("")
+                      .toUpperCase()
+                  : "ГП"}
+              </AvatarFallback>
+            </Avatar>
+          </Button>
+        </div>
       </div>
 
       <nav className="flex-1 px-3 space-y-1 overflow-y-auto">
@@ -115,6 +174,17 @@ export function Layout({ children, onLogout, userName }: LayoutProps) {
         >
           <FileText className="w-5 h-5" />
           Документи
+        </Button>
+
+        <Button
+          variant={isActive("/archive") ? "default" : "ghost"}
+          className={`w-full justify-start gap-3 ${
+            isActive("/archive") ? "" : "text-sidebar-foreground hover:bg-sidebar-accent"
+          }`}
+          onClick={() => handleNavigate("/archive")}
+        >
+          <Archive className="w-5 h-5" />
+          Архів
         </Button>
 
         <Button
@@ -205,9 +275,42 @@ export function Layout({ children, onLogout, userName }: LayoutProps) {
       </aside>
 
       {/* Mobile Header & Sidebar */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-card/95 backdrop-blur-xl border-b border-gray-200/50 dark:border-gray-800 px-4 py-3 flex items-center justify-between shadow-lg">
+      <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-white/90 dark:bg-card/95 backdrop-blur-xl border-b border-gray-200/50 dark:border-gray-800 px-4 py-3 flex items-center justify-between shadow-lg">
         <h1 className="text-blue-500">FOPilot</h1>
         <div className="flex items-center gap-2">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="icon" className="rounded-full relative">
+                <Bell className="w-5 h-5" />
+                {next && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] rounded-full px-1">1</span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-72 bg-gradient-to-br from-slate-900 to-slate-800 text-white border-slate-700 shadow-xl animate-in fade-in-0 zoom-in-95">
+              <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-slate-300 mb-1">
+                <span className="inline-block w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                Нагадування
+              </div>
+              {next ? (
+                <div className="space-y-1 text-sm">
+                  <div className="font-semibold text-white">{next.title}</div>
+                  <div className="text-slate-300 text-xs">Дедлайн {next.deadline}</div>
+                  <div className="text-slate-300 text-xs">Через {next.daysLeft} дн.</div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-3 border-amber-400 text-white hover:bg-amber-400 hover:text-slate-900"
+                    onClick={() => handleNavigate("/calendar")}
+                  >
+                    В календар
+                  </Button>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Найближчих дедлайнів немає</p>
+              )}
+            </PopoverContent>
+          </Popover>
           <Button
             variant="ghost"
             size="icon"
@@ -217,7 +320,15 @@ export function Layout({ children, onLogout, userName }: LayoutProps) {
             <Avatar className="w-8 h-8">
               <AvatarImage src="" alt="User" />
               <AvatarFallback className="bg-blue-600 text-white text-sm">
-                ІП
+                {userName
+                  ? userName
+                      .split(" ")
+                      .filter(Boolean)
+                      .slice(0, 2)
+                      .map((n) => n[0])
+                      .join("")
+                      .toUpperCase()
+                  : "ГП"}
               </AvatarFallback>
             </Avatar>
           </Button>

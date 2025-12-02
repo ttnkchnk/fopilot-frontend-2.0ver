@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Calendar as CalendarIcon, AlertCircle, Lightbulb, ChevronLeft, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
+import api from "../lib/api";
+import { toast } from "sonner";
 
 interface TaxEvent {
   id: string;
@@ -14,55 +16,57 @@ interface TaxEvent {
   urgency: "high" | "medium" | "low";
 }
 
-const generateTaxEvents = (year: number): TaxEvent[] => {
-  const events: TaxEvent[] = [];
-
-  // Щомісячний ЄСВ до 20 числа наступного місяця
-  for (let month = 0; month < 12; month++) {
-    events.push({
-      id: `esv-${year}-${month}`,
-      date: new Date(year, month, 20),
-      title: `Сплата ЄСВ за ${new Date(year, month, 1).toLocaleString("uk-UA", { month: "long" })}`,
-      description: "Оплата єдиного соціального внеску до 20 числа",
-      type: "payment",
-      urgency: "medium",
-    });
-  }
-
-  // Поквартально: декларація до 10 числа та ЄП до 20 числа після кварталу
-  const quarters = [
-    { endMonth: 2, label: "I квартал" },
-    { endMonth: 5, label: "II квартал" },
-    { endMonth: 8, label: "III квартал" },
-    { endMonth: 11, label: "IV квартал" },
-  ];
-
-  quarters.forEach((q) => {
-    events.push({
-      id: `decl-${year}-${q.endMonth}`,
-      date: new Date(year, q.endMonth + 1, 10), // наступний місяць після кварталу
-      title: `Подання декларації за ${q.label}`,
-      description: "Подання податкової декларації ФОП",
-      type: "deadline",
-      urgency: "high",
-    });
-    events.push({
-      id: `tax-${year}-${q.endMonth}`,
-      date: new Date(year, q.endMonth + 1, 20),
-      title: `Сплата ЄП за ${q.label}`,
-      description: "Оплата єдиного податку до 20 числа",
-      type: "payment",
-      urgency: "high",
-    });
-  });
-
-  return events;
-};
-
 export function TaxCalendarScreen() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const events = generateTaxEvents(currentDate.getFullYear());
+  const [events, setEvents] = useState<TaxEvent[]>([]);
+
+  const loadEvents = async (year: number) => {
+    try {
+      const { data } = await api.get("/calendar", { params: { year } });
+      const combined: TaxEvent[] = [];
+      data.ep.forEach((ep: any) =>
+        combined.push({
+          id: `ep-${ep.period}`,
+          date: new Date(ep.deadline),
+          title: `Сплата ЄП за ${ep.period}`,
+          description: "Оплата єдиного податку до 20 числа",
+          type: "payment",
+          urgency: "medium",
+        })
+      );
+      data.esv.forEach((item: any) =>
+        combined.push({
+          id: `esv-${item.quarter}`,
+          date: new Date(item.deadline),
+          title: `Сплата ЄСВ за ${item.quarter}-й квартал`,
+          description: "ЄСВ за квартал",
+          type: "payment",
+          urgency: "high",
+        })
+      );
+      data.declaration.forEach((item: any) =>
+        combined.push({
+          id: `decl-${item.quarter}`,
+          date: new Date(item.deadline),
+          title: `Декларація за ${item.quarter}-й квартал`,
+          description: "Подання декларації ФОП 3 групи",
+          type: "deadline",
+          urgency: "high",
+        })
+      );
+      setEvents(combined);
+    } catch (error) {
+      console.error("Не вдалося отримати календар", error);
+      toast.error("Не вдалося отримати календар, показуємо пусті дати");
+      setEvents([]);
+    }
+  };
+
+  useEffect(() => {
+    loadEvents(currentDate.getFullYear());
+  }, []);
+
   const nextEvent = (() => {
     const today = new Date();
     return events.filter((e) => e.date >= today).sort((a, b) => a.date.getTime() - b.date.getTime())[0];
@@ -76,11 +80,15 @@ export function TaxCalendarScreen() {
   const adjustedFirstDay = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1;
 
   const previousMonth = () => {
-    setCurrentDate(new Date(currentYear, currentMonth - 1, 1));
+    const newDate = new Date(currentYear, currentMonth - 1, 1);
+    setCurrentDate(newDate);
+    loadEvents(newDate.getFullYear());
   };
 
   const nextMonth = () => {
-    setCurrentDate(new Date(currentYear, currentMonth + 1, 1));
+    const newDate = new Date(currentYear, currentMonth + 1, 1);
+    setCurrentDate(newDate);
+    loadEvents(newDate.getFullYear());
   };
 
   const getEventsForDate = (date: Date) => {
